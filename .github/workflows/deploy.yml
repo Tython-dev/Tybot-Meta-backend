@@ -35,30 +35,16 @@ jobs:
       - name: Deploy to VM via Bastion
         uses: appleboy/ssh-action@v0.1.8
         with:
-          host: 192.168.100.15 # VM private IP
+          host: 192.168.100.15
           username: tybot
 
-          key: |
-            -----BEGIN OPENSSH PRIVATE KEY-----
-            b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
-            QyNTUxOQAAACBz7hvxUQDUoenKmDl9+I/G2rLRfq5X4qqvKvXeCR7M1QAAAKBJaac9SWmn
-            PQAAAAtzc2gtZWQyNTUxOQAAACBz7hvxUQDUoenKmDl9+I/G2rLRfq5X4qqvKvXeCR7M1Q
-            AAAEDbZRpOi7LE53J5RptjmwZCIYV0dJ+7Z+ci3EqTWvv5XnPuG/FRANSh6cqYOX34j8ba
-            stF+rlfiqq8q9d4JHszVAAAAGUdpdEh1YiBBY3Rpb25zIERlcGxveSBLZXkBAgME
-            -----END OPENSSH PRIVATE KEY-----
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-          proxy_host: 37.59.23.215 # Proxmox public IP
+          proxy_host: 37.59.23.215
           proxy_port: 22
           proxy_username: root
 
-          proxy_key: |
-            -----BEGIN OPENSSH PRIVATE KEY-----
-            b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
-            QyNTUxOQAAACBz7hvxUQDUoenKmDl9+I/G2rLRfq5X4qqvKvXeCR7M1QAAAKBJaac9SWmn
-            PQAAAAtzc2gtZWQyNTUxOQAAACBz7hvxUQDUoenKmDl9+I/G2rLRfq5X4qqvKvXeCR7M1Q
-            AAAEDbZRpOi7LE53J5RptjmwZCIYV0dJ+7Z+ci3EqTWvv5XnPuG/FRANSh6cqYOX34j8ba
-            stF+rlfiqq8q9d4JHszVAAAAGUdpdEh1YiBBY3Rpb25zIERlcGxveSBLZXkBAgME
-            -----END OPENSSH PRIVATE KEY-----
+          proxy_key: ${{ secrets.SSH_PRIVATE_KEY }}
 
           script: |
             echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
