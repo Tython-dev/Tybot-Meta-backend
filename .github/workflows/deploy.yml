@@ -65,4 +65,4 @@ jobs:
             docker pull tython0tyx/tython_dev:meta_api
             docker stop meta_api || true
             docker rm meta_api || true
-            docker run -d --name meta_api -p 3009:3009 tython0tyx/tython_dev:meta_api
+            docker run -d --name meta_api -p 3010:3009 tython0tyx/tython_dev:meta_api
