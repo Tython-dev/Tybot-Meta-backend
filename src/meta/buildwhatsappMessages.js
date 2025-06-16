@@ -134,6 +134,7 @@ async function buildMsg (item, phone){
         }
       }
   if (item.type === "card") {
+    console.log('here is the issue:', item)
   const others = [];
   var bodyText = item.title;
  for (const u of item.actions) {
@@ -146,7 +147,8 @@ async function buildMsg (item, phone){
       }
     }
 
-
+ const payload = item.actions[0].payload
+ 
   return {
     ...base,
     type: "interactive",
@@ -167,7 +169,7 @@ async function buildMsg (item, phone){
           ? others.map(b => ({
               type: "reply",
               reply: {
-                id: b.id || b.url || b.title,
+                id: JSON.stringify(payload),
                 title: b.title
               }
             }))
