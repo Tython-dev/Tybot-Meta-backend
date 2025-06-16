@@ -13,7 +13,7 @@ const options = {
 				url: "http://localhost:3009/api/v1/",
 			},
 			{
-				url: "https://tybot-api.tython.org/api/v1",
+				url: "http://meta-api.tybot.ma/api/v1",
 			},
 		],
 		components: {
