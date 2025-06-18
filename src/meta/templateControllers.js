@@ -181,7 +181,7 @@ function validateTemplatePayload(payload) {
       }
 
       const matches = [...component.text.matchAll(variableRegex)];
-      const expectedVars = new Set(matches.map(m => m[1])); // Set of variable numbers like "1", "2"
+      const expectedVars = new Set(matches.map(m => m[1])); 
 
       if (!component.example || !Array.isArray(component.example.body_text)) {
         errors.push('BODY must have an example with "body_text" as a non-empty 2D array.');
