@@ -81,8 +81,8 @@ const botTokenManager = {
   },
 };
 
-module.exports = {
-  authenticateToken: exports.authenticateToken,
-  getUserRoles: exports.getUserRoles,
-  botTokenManager,
-};
+// module.exports = {
+//   authenticateToken: exports.authenticateToken,
+//   getUserRoles: exports.getUserRoles,
+//   botTokenManager,
+// };
