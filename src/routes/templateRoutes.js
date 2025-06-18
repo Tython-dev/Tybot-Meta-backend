@@ -1,7 +1,7 @@
 const express = require('express')
 const { createTemplate } = require('../meta/templateControllers')
 const { getElements, updatestatus } = require('../meta/broadcast')
-const { authenticateToken } = require('../middleware/authenticateToken')
+// const { authenticateToken } = require('../middleware/authenticateToken')
 const router = express.Router()
 /**
  * @swagger
@@ -91,7 +91,7 @@ const router = express.Router()
  *       500:
  *         description: Internal server error.
  */
-router.post('/template',authenticateToken,createTemplate)
+router.post('/template',createTemplate)
 router.post('/brodcast', getElements)
 router.get('/config', updatestatus)
 module.exports = router;
