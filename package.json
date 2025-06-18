@@ -2,6 +2,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.50.0",
     "axios": "^1.10.0",
+    "concurrently": "^9.1.2",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
@@ -15,7 +16,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev": "nodemon server.js",
+    "dev": "concurrently \"nodemon server.js\" \"node src/meta/check_template_status.js\"",
     "start": "node server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

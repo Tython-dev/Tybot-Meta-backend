@@ -13,6 +13,9 @@ const options = {
 				url: "http://localhost:3009/api/v1/",
 			},
 			{
+				url: "https://aicha-azr.tython.org/proxy/3009/"
+			},
+			{
 				url: "http://meta-api.tybot.ma/api/v1",
 			},
 		],
