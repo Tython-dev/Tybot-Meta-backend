@@ -1,5 +1,5 @@
 const express = require('express')
-const { createTemplate } = require('../meta/templateControllers')
+const { createTemplate, deleteTemplate } = require('../meta/templateControllers')
 const { getElements, updatestatus } = require('../meta/broadcast')
 // const { authenticateToken } = require('../middleware/authenticateToken')
 const router = express.Router()
@@ -91,7 +91,58 @@ const router = express.Router()
  *       500:
  *         description: Internal server error.
  */
-router.post('/template',createTemplate)
+router.post('/',createTemplate)
+/**
+ * @swagger
+ * /template/{id}:
+ *   delete:
+ *     summary: Delete a template both from Supabase and Meta API
+ *     description: |
+ *       Deletes a template from Supabase and also removes it from the Meta (WhatsApp) Business API using the chatbot's configuration.
+ *       Requires the template to be linked to a WhatsApp-configured chatbot.
+ *     tags:
+ *       - Template
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: ID of the template to delete
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Template deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               example:
+ *                 message: The template has been deleted successfully.
+ *       400:
+ *         description: Bad Request – Missing ID or Supabase/Meta API error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               example:
+ *                 message: id is required!
+ *       404:
+ *         description: Template or WhatsApp configuration not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               example:
+ *                 message: template not found!
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               example:
+ *                 message: Unexpected server error
+ */
+router.delete('/:id',deleteTemplate)
 router.post('/brodcast', getElements)
-router.get('/config', updatestatus)
 module.exports = router;
