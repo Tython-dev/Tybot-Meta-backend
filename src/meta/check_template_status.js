@@ -76,4 +76,4 @@ console.log('getInfo:', getInfo)
     console.error("Unexpected error:", error.message);
   }
 };
-setInterval(check, 7 * 1000);
+setInterval(check, 60 * 1000);
