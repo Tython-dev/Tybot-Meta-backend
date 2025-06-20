@@ -17,7 +17,7 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 // Swagger setup
 app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
-app.use('/',templateroutes)
+app.use('/template',templateroutes)
 
 
 

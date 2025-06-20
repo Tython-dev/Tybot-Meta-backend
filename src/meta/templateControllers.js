@@ -290,3 +290,56 @@ if(meta_api.status === 200){
     });
   }
 };
+exports.deleteTemplate = async(req,res) =>{
+  const {id} = req.params;
+  if(!id){
+    return res.status(400).json('id is required!')
+  }
+  try{
+    const getTemplate = await supabase
+    .from("templates")
+    .select('*,chatbots(id,botId)')
+    .eq('id', id) 
+    if(getTemplate.error){
+      return res.status(400).json(getTemplate.error)
+    }
+    if(getTemplate.data.length === 0){
+      return res.status(404).json('template not found!')
+    }
+    const {template_id, name, chatbots} = getTemplate.data[0]
+    const getMetaInfo = await supabase
+    .from("channels_config")
+    .select('*, channels(name)')
+    .eq('chat_id', chatbots.id)
+    
+    if(getMetaInfo.error){
+      return res.status(400).json(getMetaInfo.error)
+    }
+    if(getMetaInfo.data.length === 0){
+      return res.status(404).json("please, add chatbot configuration in WhatsApp channel so you can delete the template!")
+    }
+   const infos = getMetaInfo.data.filter(i=> i.channels.name === "whatsapp")
+   if (infos.length === 0) {
+  return res.status(400).json("No WhatsApp channel configuration found for this chatbot.");
+}
+   const {config} = infos[0];
+   const bus_acc = config.business_account_id;
+   const token = config.token;
+  const deletefromMeta = await axios.delete(`${meta_url}/${version}/${bus_acc}/message_templates?hsm_id=${template_id}&name=${name}`,{headers: {Authorization: `Bearer ${token}`}})
+  console.log('meta_response:', deletefromMeta)
+  if(deletefromMeta.error){
+    return res.status(400).json(deletefromMeta)
+  }
+  const fromSupabase = await supabase
+  .from('templates')
+  .delete()
+  .eq('id', id)
+  if(fromSupabase.error){
+    return res.status(400).json(fromSupabase.error)
+  }
+  return res.status(200).json({message: "Template deleted successfully"})
+  }catch(error){
+    console.log('error:', error)
+    return res.status(500).json(error)
+  }
+}
