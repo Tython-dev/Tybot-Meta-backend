@@ -1,33 +1,140 @@
 const { default: axios } = require("axios");
 const { supabase } = require("../config/supabase");
 
-const bot_url = process.env.BOTPRESS_URL;
+
 const meta_url = process.env.META_URL;
 const meta_version = process.env.META_VERSION;
+const params_type = (params) => {
+  switch (params.type) {
+    case "text":
+      if (params.text === undefined) {
+        throw "The 'text' type parameter must include a 'text' attribute.";
+      }
+      break;
+
+    case "image":
+      if (params.image === undefined) {
+        throw "The 'image' type parameter must include an 'image' attribute.";
+      }
+      break;
+
+    case "currency":
+      if (params.currency === undefined) {
+        throw "The 'currency' type parameter must include a 'currency' attribute.";
+      }
+      const requiredCurrencyFields = ["fallback_value", "code", "amount_1000"];
+      requiredCurrencyFields.forEach((field) => {
+        if (params.currency[field] === undefined) {
+          throw `Currency object must contain '${field}' attribute.`;
+        }
+      });
+      break;
+
+    case "date_time":
+      if (params.date_time === undefined) {
+        throw "The 'date_time' type parameter must include a 'date_time' attribute.";
+      }
+      break;
+
+    case "video":
+      if (params.video === undefined) {
+        throw "The 'video' type parameter must include a 'video' attribute.";
+      }
+      break;
+
+    default:
+      throw "Invalid type.";
+  }
+};
+
+const body_params = (params) => {
+  if (!Array.isArray(params)) {
+    throw new Error("body_params must be an array!");
+  }
+
+  const invalidTypes = ["video", "image", "document"];
+
+  params.forEach((param) => {
+    const type = param.type;
+
+    if (invalidTypes.includes(type)) {
+      throw new Error(`The type '${type}' is not allowed in the BODY component!`);
+    }
+  });
+};
+const formatParam = (param) => {
+  params_type(param);
+
+  switch (param.type) {
+    case "text":
+      return {
+        type: "text",
+        text: param.text
+      };
+
+    case "currency":
+      return {
+        type: "currency",
+        currency: param.currency
+      };
+
+    case "date_time":
+      return {
+        type: "date_time",
+        date_time:{
+          fallback_value: param.date_time
+        }
+      };
+
+    case "image":
+      return {
+        type: "image",
+        image:{
+          link: param.image
+        }
+      };
+
+    case "video":
+      return {
+        type: "video",
+        video:{ 
+          link:param.video
+        }
+      };
+
+    case "document":
+      return {
+        type: "document",
+        document:{
+          link: param.document
+        }
+      };
+
+    default:
+      throw `Unsupported type: ${param.type}`;
+  }
+};
+
 const templateMsg = (phone, template_name, ln, header, header_parms, body, body_parms) => {
   const components = [];
 
 
+
   if (header && header_parms) {
+    const formattedHeader = formatParam(header_param);
     components.push({
       type: "header",
-      parameters: [
-        {
-          type: "text",
-          text: header_parms
-        }
-      ]
+      parameters: [formattedHeader]
     });
   }
 
-  
+
   if (body && Array.isArray(body_parms)) {
+    body_params.forEach(body_params_item => body_params(body_params_item)); // validate types
+    const formattedBody = body_params.map(formatParam);
     components.push({
       type: "body",
-      parameters: body_parms.map(p => ({
-        type: "text",
-        text: p
-      }))
+      parameters: formattedBody
     });
   }
 
@@ -112,24 +219,4 @@ return res.json(sendMessage.data)
     console.log('error:', error?.response?.data || error.message)
     return res.status(500).json( error?.response?.data || error.message)
 }
-}
-exports.updatestatus = async(req, res)=>{
-    const { data, error } = await supabase
-  .from("templates")
-  .select(`
-    id,
-    name,
-    botId,
-    chatbots (
-      id,
-      botId,
-      channels_config (
-        id,
-        channel_id,
-        config
-      )
-    )
-  `);
-  return res.json(data)
-
 }
