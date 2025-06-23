@@ -16,7 +16,7 @@ const options = {
 				url: "https://aicha-azr.tython.org/proxy/3009/"
 			},
 			{
-				url: "http://meta-api.tybot.ma/api/v1",
+				url: "http://meta-api.tybot.ma",
 			},
 		],
 		components: {
