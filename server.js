@@ -18,8 +18,8 @@ const multer = require('multer');
 const upload = multer({ dest: 'uploads/' });
 // CORS Configuration
 const allowedOrigins = [
-	"http://meta-api.tybot.ma",
-  "http://localhost:5173"
+	"http://meta-api.tybot.ma/",
+  "http://localhost:5173/"
 ];
 const corsOptions = {
   origin: (origin, callback) => {

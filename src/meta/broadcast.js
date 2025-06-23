@@ -221,6 +221,7 @@ return res.json(sendMessage.data)
 }
 }
 exports.createOne = async (req,res)=>{
+  const {chatbot_id,domain_id,chnannel_id,scheduled_time,name,users}= req.body
   if(!chatbot_id || !domain_id || !chnannel_id || !scheduled_time || !name || !users){
     return res.status(400).json("make sûre, these fields are required:chatbot_id,!domain_id,!chnannel_id,!scheduled_time,name and users ")
   }
@@ -232,6 +233,46 @@ exports.createOne = async (req,res)=>{
     return res.status(403).json("you do not have permission to create a broadcast")
   }
   try{
+    let status, role;
+    const getUserInfo = await supabase
+    .from("user_role")
+    .select("role(slug)")
+    .eq("id_user", user)
+    if(getUserInfo.error){
+      return res.status(400).json(getUserInfo.error)
+    }
+    const roles = [];
+    getUserInfo.data.forEach(role => {
+      roles.push(role.slug)
+    });
+    if(!roles.includes("dom-admin") ||!roles.includes("ws-admin") ){
+      return res.status(403).json("you do not have permission to create a broadcast")
+    }
+    if(roles.includes("dom-admin")){ status = "accepted"; role = "dom"}
+    if(roles.includes("ws-admin")) {status = "pending"; role = "ws"}
+
+    const domainUsers = await supabase
+    .from("user_domain")
+    .select("id_user")
+    .eq("id_domain", domain_id)
+    if(domainUsers.error){
+      return res.status(400).json(domainUsers.error)
+    }
+    if(!domainUsers.data || !domainUsers.data.filter(i=>i.id_user === user)){
+      return res.status(403).json("you do not have the permission to create any template in this domaine")
+    }
+    if(role === "ws"){
+    const getWs = await supabase
+    .from("workspaces")
+    .select("id")
+    .eq("domain_id", domain_id)
+    if(getWs.error){
+      return res.status(400).json(getWs.error)
+    }
+    if(!getWs.data){
+      return ;
+    }
+}
     const addBroadcast = await supabase
     .from('broadcasts')
     .insert(req.body)
