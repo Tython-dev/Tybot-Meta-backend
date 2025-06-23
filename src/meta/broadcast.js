@@ -220,3 +220,28 @@ return res.json(sendMessage.data)
     return res.status(500).json( error?.response?.data || error.message)
 }
 }
+exports.createOne = async (req,res)=>{
+  if(!chatbot_id || !domain_id || !chnannel_id || !scheduled_time || !name || !users){
+    return res.status(400).json("make sûre, these fields are required:chatbot_id,!domain_id,!chnannel_id,!scheduled_time,name and users ")
+  }
+  if(!Array.isArray(users)){
+    return res.status(400).json("users must be an array!")
+  }
+  const user = req.user?.sub;
+  if(!user){
+    return res.status(403).json("you do not have permission to create a broadcast")
+  }
+  try{
+    const addBroadcast = await supabase
+    .from('broadcasts')
+    .insert(req.body)
+    .select('*')
+    if(addBroadcast.error){
+      return res.status(400).json(addBroadcast.error)
+    }
+    const id = addBroadcast.data[0]?.id;
+
+  }catch(error){
+    return res.status(500).json(error)
+  }
+}
