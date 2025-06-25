@@ -125,8 +125,8 @@ if(countMap["PHONE_NUMBER"] > 1){
 return {valid:true}
 }
 require("dotenv");
-const meta_url = process.env.META_URL;
-const version = process.env.META_VERSION
+const meta_url = process.env.META_URL || "https://graph.facebook.com";
+const version = process.env.META_VERSION || "v23.0";
 function validateTemplatePayload(payload) {
   if (typeof payload !== 'object' || payload === null) {
     return { valid: false, error: 'Payload must be an object.' };
