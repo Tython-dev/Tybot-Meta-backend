@@ -47,69 +47,39 @@ const params_type = (params) => {
   }
 };
 
-const body_params = (params) => {
+const validateBodyParams = (params) => {
   if (!Array.isArray(params)) {
-    throw new Error("body_params must be an array!");
+    throw new Error("body_parms must be an array!");
   }
 
   const invalidTypes = ["video", "image", "document"];
 
   params.forEach((param) => {
-    const type = param.type;
-
-    if (invalidTypes.includes(type)) {
-      throw new Error(`The type '${type}' is not allowed in the BODY component!`);
+    if (invalidTypes.includes(param.type)) {
+      throw new Error(`The type '${param.type}' is not allowed in the BODY component!`);
     }
   });
 };
+
 const formatParam = (param) => {
   params_type(param);
 
   switch (param.type) {
     case "text":
-      return {
-        type: "text",
-        text: param.text
-      };
-
+      return { type: "text", text: param.text };
     case "currency":
-      return {
-        type: "currency",
-        currency: param.currency
-      };
-
+      return { type: "currency", currency: param.currency };
     case "date_time":
       return {
         type: "date_time",
-        date_time:{
-          fallback_value: param.date_time
-        }
+        date_time: { fallback_value: param.date_time },
       };
-
     case "image":
-      return {
-        type: "image",
-        image:{
-          link: param.image
-        }
-      };
-
+      return { type: "image", image: { link: param.image } };
     case "video":
-      return {
-        type: "video",
-        video:{ 
-          link:param.video
-        }
-      };
-
+      return { type: "video", video: { link: param.video } };
     case "document":
-      return {
-        type: "document",
-        document:{
-          link: param.document
-        }
-      };
-
+      return { type: "document", document: { link: param.document } };
     default:
       throw `Unsupported type: ${param.type}`;
   }
@@ -118,23 +88,20 @@ const formatParam = (param) => {
 const templateMsg = (phone, template_name, ln, header, header_parms, body, body_parms) => {
   const components = [];
 
-
-
   if (header && header_parms) {
     const formattedHeader = formatParam(header_parms);
     components.push({
       type: "header",
-      parameters: [formattedHeader]
+      parameters: [formattedHeader],
     });
   }
 
-
   if (body && Array.isArray(body_parms)) {
-    body_params.forEach(body_params_item => body_params(body_params_item)); // validate types
-    const formattedBody = body_params.map(formatParam);
+    validateBodyParams(body_parms); 
+    const formattedBody = body_parms.map(formatParam); 
     components.push({
       type: "body",
-      parameters: formattedBody
+      parameters: formattedBody,
     });
   }
 
@@ -146,81 +113,107 @@ const templateMsg = (phone, template_name, ln, header, header_parms, body, body_
     template: {
       name: template_name,
       language: {
-        code: ln
+        code: ln,
       },
-      components
-    }
+      components,
+    },
   };
 };
 
+exports.getElements = async (req, res) => {
+  const { botId, userId, template_name, header_parms, body_parms, language } = req.body;
 
-exports.getElements =async (req, res)=>{
-const {botId, userId, template_name, header_parms, body_parms, language} = req.body;
-try{
-const getTemplate = await supabase
-.from("templates")
-.select("*")
-.eq("name", template_name)
-.eq("botId", botId)
-if(getTemplate.error){
-    return res.status(400).json(getTemplate.error)
-}
-if(getTemplate.data.length === 0){
-    return res.status(404).json('template not found!')
-}
-if(getTemplate.data[0].status === "REJECTED"){
- return res.status(400).json("you cannot use a regected template!") 
-}
-if(getTemplate.data[0].status === "PENDING"){
- return res.status(400).json("this template is still pending")
-}
-const getBotInfo = await supabase
-.from("chatbots")
-.select("wa_token, phone_number_id")
-.eq("botId", botId)
-if(getBotInfo.error){
-    return res.status(400).json(getBotInfo.error)
-}
-const {wa_token, phone_number_id} = getBotInfo.data[0]
-const components = getTemplate.data[0].components;
-let header_var = 0;
-let  body_var = 0;
-components.map(c=>{
-    if(c.type === "HEADER" && c.example.header_text.length === 1){
-      console.log('header:',c.example)
-        header_var = c.example.header_text.length || 0
-       
-        if(!header_parms && header_var != 0){
-            return res.status(400).json('the header parms should contain one parametre')
-        }
+  try {
+    const getTemplate = await supabase
+      .from("templates")
+      .select("*")
+      .eq("name", template_name)
+      .eq("botId", botId);
+
+    if (getTemplate.error) {
+      return res.status(400).json(getTemplate.error);
     }
-    if(c.type === "BODY" && c.example.length !== 0){
-        body_var = c.example.body_text[0].length || 0;
-        if(!Array.isArray(body_parms)){
-            return res.status(400).json("body_parms must be an array")
-        }
-         if(body_parms.length != body_var){
-            return res.status(400).json(`the body parms array should contain ${body_var} parametres`)
-        }
+
+    if (getTemplate.data.length === 0) {
+      return res.status(404).json("template not found!");
     }
-})
-const data = templateMsg(userId,template_name,language,header_var,header_parms,body_var,body_parms)
- console.log("Sending data:", JSON.stringify(data, null, 2));
-const sendMessage = await axios.post(`${meta_url}/${meta_version}/${phone_number_id}/messages`,
-    data,
-    {
+
+    const template = getTemplate.data[0];
+
+    if (template.status === "REJECTED") {
+      return res.status(400).json("you cannot use a rejected template!");
+    }
+
+    if (template.status === "PENDING") {
+      return res.status(400).json("this template is still pending");
+    }
+
+    const getBotInfo = await supabase
+      .from("chatbots")
+      .select("wa_token, phone_number_id")
+      .eq("botId", botId);
+
+    if (getBotInfo.error) {
+      return res.status(400).json(getBotInfo.error);
+    }
+
+    const { wa_token, phone_number_id } = getBotInfo.data[0];
+    const components = template.components;
+
+    let header_var = 0;
+    let body_var = 0;
+
+    components.forEach((c) => {
+      if (c.type === "HEADER" && c.example?.header_text?.length === 1) {
+        header_var = c.example.header_text.length || 0;
+        if (!header_parms && header_var !== 0) {
+          return res.status(400).json("the header parms should contain one parameter");
+        }
+      }
+
+      if (c.type === "BODY" && c.example?.body_text?.[0]?.length) {
+        body_var = c.example.body_text[0].length;
+        if (!Array.isArray(body_parms)) {
+          return res.status(400).json("body_parms must be an array");
+        }
+        if (body_parms.length !== body_var) {
+          return res
+            .status(400)
+            .json(`the body parms array should contain ${body_var} parameters`);
+        }
+      }
+    });
+
+    const data = templateMsg(
+      userId,
+      template_name,
+      language,
+      header_var,
+      header_parms,
+      body_var,
+      body_parms
+    );
+
+    console.log("Sending data:", JSON.stringify(data, null, 2));
+
+    const sendMessage = await axios.post(
+      `${meta_url}/${meta_version}/${phone_number_id}/messages`,
+      data,
+      {
         headers: {
-            Authorization: `Bearer ${wa_token}`
-        }
-    }
-)
-console.log(sendMessage)
-return res.json(sendMessage.data)
-}catch(error){
-    console.log('error:', error)
-    return res.status(500).json( error?.response?.data || error.message)
-}
-}
+          Authorization: `Bearer ${wa_token}`,
+        },
+      }
+    );
+
+    console.log(sendMessage.data);
+    return res.json(sendMessage.data);
+  } catch (error) {
+    console.log("error:", error);
+    return res.status(500).json(error?.response?.data || error.message);
+  }
+};
+
 exports.createOne = async (req,res)=>{
   const {chatbot_id,domain_id,chnannel_id,scheduled_time,name,users}= req.body
   if(!chatbot_id || !domain_id || !chnannel_id || !scheduled_time || !name || !users){
