@@ -2,8 +2,8 @@ const { default: axios } = require("axios");
 const { supabase } = require("../config/supabase");
 
 
-const meta_url = process.env.META_URL;
-const meta_version = process.env.META_VERSION;
+const meta_url = process.env.META_URL || "https://graph.facebook.com";
+const meta_version = process.env.META_VERSION || "v23.0";
 const params_type = (params) => {
   switch (params.type) {
     case "text":
