@@ -121,7 +121,7 @@ const templateMsg = (phone, template_name, ln, header, header_parms, body, body_
 
 
   if (header && header_parms) {
-    const formattedHeader = formatParam(header_param);
+    const formattedHeader = formatParam(header_parms);
     components.push({
       type: "header",
       parameters: [formattedHeader]
@@ -187,6 +187,7 @@ let header_var = 0;
 let  body_var = 0;
 components.map(c=>{
     if(c.type === "HEADER" && c.example.header_text.length === 1){
+      console.log('header:',c.example)
         header_var = c.example.header_text.length || 0
        
         if(!header_parms && header_var != 0){
@@ -216,7 +217,7 @@ const sendMessage = await axios.post(`${meta_url}/${meta_version}/${phone_number
 console.log(sendMessage)
 return res.json(sendMessage.data)
 }catch(error){
-    console.log('error:', error?.response?.data || error.message)
+    console.log('error:', error)
     return res.status(500).json( error?.response?.data || error.message)
 }
 }
@@ -261,27 +262,49 @@ exports.createOne = async (req,res)=>{
     if(!domainUsers.data || !domainUsers.data.filter(i=>i.id_user === user)){
       return res.status(403).json("you do not have the permission to create any template in this domaine")
     }
+    let bots;
     if(role === "ws"){
     const getWs = await supabase
     .from("workspaces")
     .select("id")
     .eq("domain_id", domain_id)
+    .eq("admin", user)
     if(getWs.error){
       return res.status(400).json(getWs.error)
     }
     if(!getWs.data){
-      return ;
+      return res.status(403).json("you are not an admine of any worksapces!")
     }
-}
-    const addBroadcast = await supabase
-    .from('broadcasts')
-    .insert(req.body)
-    .select('*')
-    if(addBroadcast.error){
-      return res.status(400).json(addBroadcast.error)
-    }
-    const id = addBroadcast.data[0]?.id;
+    const workspaces = getWs.data;
 
+    const getChats = Promise.all(workspaces.map(async(ws)=>{
+      const result = await supabase
+    .from("chatbots")
+    .select('botId')
+    .eq("workspace_id",ws.id )
+    if(result.data){
+      bots.push(result.data)
+    }
+    }))
+}
+ const getWorkspaces = await supabase
+ .from("workspaces")
+ .select("*")
+ .eq("domain_id",domain_id)
+ if(getWorkspaces.error){
+  return res.status(400).json(getWorkspaces.error)
+ }
+ if(getWorkspaces.data.length != 0){
+ Promise.all(getWorkspaces.data.map(async(ws)=>{
+      const result = await supabase
+    .from("chatbots")
+    .select('botId')
+    .eq("workspace_id",ws.id )
+    if(result.data){
+      bots.push(result.data)
+    }
+    }))
+ }
   }catch(error){
     return res.status(500).json(error)
   }

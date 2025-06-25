@@ -16,6 +16,8 @@ const templateroutes = require("./src/routes/templateRoutes");
 const { default: axios } = require('axios');
 const multer = require('multer');
 const upload = multer({ dest: 'uploads/' });
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 // CORS Configuration
 const allowedOrigins = [
 	"http://meta-api.tybot.ma",
@@ -39,8 +41,7 @@ const corsOptions = {
 app.use(cors(corsOptions));
 // app.use(cors());
 
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+
 // Swagger setup
 app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use('/template',templateroutes)

@@ -343,3 +343,34 @@ exports.deleteTemplate = async(req,res) =>{
     return res.status(500).json(error)
   }
 }
+exports.getTemplates = async (req,res) =>{
+  try{
+    const templates = await supabase
+    .from('templates')
+    .select("*,chatbots(name)")
+    if(templates.error){
+      return res.status(400).json(templates.error)
+    }
+    return res.status(200).json(templates.data)
+  }catch(error){
+    return res.status(500).json(error)
+  }
+}
+exports.getTemplatesByBot = async (req,res) =>{
+  const {botId} = req.params;
+  if(!botId){
+    return res.status(400).json("botId is required!")
+  }
+  try{
+    const templates = await supabase
+    .from('templates')
+    .select("*,chatbots(name)")
+    .eq('botId', botId)
+    if(templates.error){
+      return res.status(400).json(templates.error)
+    }
+    return res.status(200).json(templates.data)
+  }catch(error){
+    return res.status(500).json(error)
+  }
+}
