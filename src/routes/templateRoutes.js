@@ -1,5 +1,5 @@
 const express = require('express')
-const { createTemplate, deleteTemplate } = require('../meta/templateControllers')
+const { createTemplate, deleteTemplate, getTemplates, getTemplatesByBot } = require('../meta/templateControllers')
 const { getElements, updatestatus } = require('../meta/broadcast')
 // const { authenticateToken } = require('../middleware/authenticateToken')
 const router = express.Router()
@@ -144,5 +144,81 @@ router.post('/',createTemplate)
  *                 message: Unexpected server error
  */
 router.delete('/:id',deleteTemplate)
-router.post('/brodcast', getElements)
+/**
+ * @swagger
+ * /template/broadcast:
+ *   post:
+ *     summary: Sends a WhatsApp template message using Meta API
+ *     description: |
+ *       Validates a template by name and bot ID, checks for required parameters
+ *       based on the template's component type (HEADER, BODY), formats the message 
+ *       accordingly, and sends it via WhatsApp Cloud API using stored bot credentials.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - botId
+ *               - userId
+ *               - template_name
+ *               - language
+ *             properties:
+ *               botId:
+ *                 type: string
+ *                 description: The unique identifier of the chatbot.
+ *               userId:
+ *                 type: string
+ *                 description: The recipient's WhatsApp phone number in international format.
+ *               template_name:
+ *                 type: string
+ *                 description: The name of the WhatsApp template to send.
+ *               language:
+ *                 type: string
+ *                 description: Language code of the template (e.g., 'en_US').
+ *               header_parms:
+ *                 type: object
+ *                 description: Optional parameter for the template's header component.
+ *                 example:
+ *                   type: text
+ *                   text: "Header Text"
+ *               body_parms:
+ *                 type: array
+ *                 description: Optional array of parameters for the template's body component.
+ *                 items:
+ *                   type: object
+ *                   example:
+ *                     type: text
+ *                     text: "Body parameter"
+ *     responses:
+ *       200:
+ *         description: Template message sent successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               description: Response from WhatsApp Cloud API
+ *       400:
+ *         description: Bad request - missing or invalid parameters, rejected or pending template, or Supabase error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: string
+ *       404:
+ *         description: Template not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: string
+ *       500:
+ *         description: Internal server error or failed to send message
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ */
+router.post('/broadcast', getElements)
+router.get("/:botId", getTemplatesByBot)
+router.get("/", getTemplates)
 module.exports = router;
