@@ -129,7 +129,7 @@ app.post('/upload-template-image', upload.single('file'), async (req, res) => {
  *         description: Internal Server Error
  */
 
-app.put('chatbots/switch-bots', async (req, res) => {
+app.put('/chatbots/switch-bots', async (req, res) => {
   const { bot1, bot2, channel } = req.body;
 
   try {
