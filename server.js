@@ -141,19 +141,19 @@ const updateBot1 = await supabase
   .from("chatbots")
   .update({ botId: tempId })
   .eq("botId", bot1)
-  .select("id");
-
+  .select("id,name");
+const name1 = updateBot1.data?.[0]?.name;
 // Step 2: Update bot2 to bot1
 const updateBot2= await supabase
   .from("chatbots")
-  .update({ botId: bot1 })
+  .update({ botId: bot1, name:name1 })
   .eq("botId", bot2)
-  .select("id");
-
+  .select("id, name");
+const name2 = updateBot2.data?.[0]?.name;
 // Step 3: Update temp (was bot1) to bot2
 await supabase
   .from("chatbots")
-  .update({ botId: bot2 })
+  .update({ botId: bot2, name: name2 })
   .eq("botId", tempId)
   .select("id");
 
