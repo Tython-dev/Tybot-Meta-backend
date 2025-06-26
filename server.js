@@ -133,67 +133,65 @@ app.put('/chatbots/switch-bots', async (req, res) => {
   const { bot1, bot2, channel } = req.body;
 
   try {
-    // 1. Update chatbots: swap botIds
-    // Step 1: Temporarily rename bot1
-const tempId = "TEMP_SWAP_ID_" + Date.now();
+    const tempId = "TEMP_" + Date.now();
 
-const updateBot1 = await supabase
-  .from("chatbots")
-  .update({ botId: tempId })
-  .eq("botId", bot1)
-  .select("id,name");
-const name1 = updateBot1.data?.[0]?.name;
-// Step 2: Update bot2 to bot1
-const updateBot2= await supabase
-  .from("chatbots")
-  .update({ botId: bot1, name:name1 })
-  .eq("botId", bot2)
-  .select("id, name");
-const name2 = updateBot2.data?.[0]?.name;
-// Step 3: Update temp (was bot1) to bot2
-await supabase
-  .from("chatbots")
-  .update({ botId: bot2, name: name2 })
-  .eq("botId", tempId)
-  .select("id");
+    // Get both bots
+    const [bot1Res, bot2Res] = await Promise.all([
+      supabase.from("chatbots").select("id, name").eq("botId", bot1),
+      supabase.from("chatbots").select("id, name").eq("botId", bot2)
+    ]);
 
-      
-      const id_bot1 = updateBot1.data?.[0]?.id;
-    const id_bot2 = updateBot2.data?.[0]?.id;
+    const bot1Data = bot1Res.data?.[0];
+    const bot2Data = bot2Res.data?.[0];
 
-    // 2. Get channel ID by name
+    if (!bot1Data || !bot2Data) {
+      return res.status(404).json({ error: "One or both bots not found" });
+    }
+
+    //  Rename bot1 to temporary
+    await supabase
+      .from("chatbots")
+      .update({ botId: tempId })
+      .eq("botId", bot1);
+
+    //Update bot2 to bot1's botId and name
+    await supabase
+      .from("chatbots")
+      .update({ botId: bot1, name: bot1Data.name })
+      .eq("botId", bot2);
+
+    // Update temp (bot1) to bot2's botId and name
+    await supabase
+      .from("chatbots")
+      .update({ botId: bot2, name: bot2Data.name })
+      .eq("botId", tempId);
+
+    // Get channel ID
     const channelRes = await supabase
       .from("channels")
       .select("id")
       .eq("name", channel);
-
     const id_channel = channelRes.data?.[0]?.id;
-console.log(updateBot1,id_bot1,updateBot2, id_bot2)
-    // 3. Get configuration for both bots
+
+    // Get both config rows
     const configRes = await supabase
       .from("channels_config")
       .select("id, config, chat_id")
       .eq("channel_id", id_channel)
-      .in("chat_id", [id_bot1, id_bot2]);
-console.log('configRes:', configRes)
-    const config1 = configRes.data?.find(c => c.chat_id === id_bot1);
-    const config2 = configRes.data?.find(c => c.chat_id === id_bot2);
+      .in("chat_id", [bot1Data.id, bot2Data.id]);
 
-    // 4. Swap the configs
-    const updateConfig1 = await supabase
-      .from("channels_config")
-      .update({ config: config2?.config })
-      .eq("id", config1?.id);
+    const config1 = configRes.data?.find(c => c.chat_id === bot1Data.id);
+    const config2 = configRes.data?.find(c => c.chat_id === bot2Data.id);
 
-    const updateConfig2 = await supabase
-      .from("channels_config")
-      .update({ config: config1?.config })
-      .eq("id", config2?.id);
+    // Swap configs
+    await Promise.all([
+      supabase.from("channels_config").update({ config: config2?.config }).eq("id", config1?.id),
+      supabase.from("channels_config").update({ config: config1?.config }).eq("id", config2?.id)
+    ]);
 
     return res.status(200).json({
       message: "Bots and configurations switched successfully",
-      bots: { bot1, bot2 },
-      configs: { config1: config2?.config, config2: config1?.config },
+      bots: { old_bot1: bot1, old_bot2: bot2 },
     });
 
   } catch (error) {
@@ -201,6 +199,7 @@ console.log('configRes:', configRes)
     return res.status(500).json({ error: "An error occurred while switching bots and configs." });
   }
 });
+
 
 app.listen(port, () => {
   console.log(`Server is running at http://localhost:${port}`);
