@@ -1,12 +1,14 @@
 {
   "dependencies": {
     "@supabase/supabase-js": "^2.50.0",
+    "aws-sdk": "^2.1692.0",
     "axios": "^1.10.0",
     "concurrently": "^9.1.2",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
     "form-data": "^4.0.3",
+    "ioredis": "^5.6.1",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.1",
     "nodemon": "^3.1.10",

@@ -12,6 +12,7 @@ const swaggerUi = require("swagger-ui-express");
 const app = express();
 const port = process.env.PORT || 3009;
 const templateroutes = require("./src/routes/templateRoutes");
+const uploadFiles = require("./src/routes/metaUpload")
 const { default: axios } = require('axios');
 const multer = require('multer');
 const { supabase } = require('./src/config/supabase');
@@ -45,7 +46,7 @@ app.use(cors(corsOptions));
 // Swagger setup
 app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use('/template',templateroutes)
-
+app.use("/meta-upload", uploadFiles)
 
 
 
@@ -58,31 +59,6 @@ app.get('/', async (req, res) => {
 
 }
 );
-app.post('/upload-template-image', upload.single('file'), async (req, res) => {
-  try {
-    const filePath = req.file.path;
-    const form = new FormData();
-    form.append('file', fs.createReadStream(filePath));
-    form.append('type', 'image/jpeg');
-    form.append('messaging_product', 'whatsapp');
-
-    const { data } = await axios.post(
-      `https://graph.facebook.com/v19.0/<WABA_ID>/media`,
-      form,
-      {
-        headers: {
-          ...form.getHeaders(),
-          'Authorization': `Bearer ${process.env.FB_ACCESS_TOKEN}`
-        }
-      }
-    );
-
-    res.json({ media_id: data.id });
-  } catch (err) {
-    console.error("Upload failed:", err);
-    res.status(500).json({ error: 'Upload failed' });
-  }
-});
 /**
  * @swagger
  * /chatbots/switch-bots:
