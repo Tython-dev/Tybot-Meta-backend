@@ -10,55 +10,8 @@ const router = express.Router()
  *     summary: Create WhatsApp Message Template
  *     description: >
  *       Creates a new WhatsApp message template for a chatbot.  
- *       🔹 The request must contain a botId and a payload matching Meta's message template structure.  
- *       🔹 The body **must** look like this:
- *
- *       ```json
- *       {
- *         "botId": "izar-logistic",
- *         "payload": {
- *           "name": "order_confirmation",
- *           "language": "en_US",
- *           "category": "MARKETING",
- *           "components": [
- *             {
- *               "type": "HEADER",
- *               "format": "TEXT",
- *               "text": "Order {{1}} Confirmed",
- *               "example": {
- *                 "header_text": ["#123456"]
- *               }
- *             },
- *             {
- *               "type": "BODY",
- *               "text": "Hi {{1}}, your order {{2}} has been confirmed and will be delivered by {{3}}.",
- *               "example": {
- *                 "body_text": [
- *                   ["Aicha", "#123456", "Monday, June 17"]
- *                 ]
- *               }
- *             },
- *             {
- *               "type": "FOOTER",
- *               "text": "Thanks for shopping with us!"
- *             },
- *             {
- *               "type": "BUTTONS",
- *               "buttons": [
- *                 {
- *                   "type": "QUICK_REPLY",
- *                   "text": "Track Order"
- *                 },
- *                 {
- *                   "type": "QUICK_REPLY",
- *                   "text": "Cancel Order"
- *                 }
- *               ]
- *             }
- *           ]
- *         }
- *       }
- *       ```
+ *       🔹 The request must contain a `botId` and a `payload` matching Meta's message template structure.  
+ *       🔹 Choose one of the examples below based on your HEADER format (TEXT, IMAGE, DOCUMENT, or VIDEO).
  *     tags:
  *       - Template
  *     requestBody:
@@ -73,6 +26,87 @@ const router = express.Router()
  *                 example: izar-logistic
  *               payload:
  *                 type: object
+ *           examples:
+ *             TEXT_Header:
+ *               summary: Template with TEXT header
+ *               value:
+ *                 botId: izar-logistic
+ *                 payload:
+ *                   name: order_confirmation
+ *                   language: en_US
+ *                   category: MARKETING
+ *                   components:
+ *                     - type: HEADER
+ *                       format: TEXT
+ *                       text: Order {{1}} Confirmed
+ *                       example:
+ *                         header_text: ["#123456"]
+ *                     - type: BODY
+ *                       text: Hi {{1}}, your order {{2}} has been confirmed and will be delivered by {{3}}.
+ *                       example:
+ *                         body_text: [["Aicha", "#123456", "Monday, June 17"]]
+ *                     - type: FOOTER
+ *                       text: Thanks for shopping with us!
+ *                     - type: BUTTONS
+ *                       buttons:
+ *                         - type: QUICK_REPLY
+ *                           text: Track Order
+ *                         - type: QUICK_REPLY
+ *                           text: Cancel Order
+
+ *             IMAGE_Header:
+ *               summary: Template with IMAGE header
+ *               value:
+ *                 botId: izar-logistic
+ *                 payload:
+ *                   name: promo_banner
+ *                   language: en_US
+ *                   category: MARKETING
+ *                   components:
+ *                     - type: HEADER
+ *                       format: IMAGE
+ *                       example:
+ *                         header_handle: ["media_id_123"]
+ *                     - type: BODY
+ *                       text: Don't miss our summer sale, {{1}}! Up to 50% off.
+ *                       example:
+ *                         body_text: [["Aicha"]]
+
+ *             DOCUMENT_Header:
+ *               summary: Template with DOCUMENT header
+ *               value:
+ *                 botId: izar-logistic
+ *                 payload:
+ *                   name: invoice_template
+ *                   language: en_US
+ *                   category: TRANSACTIONAL
+ *                   components:
+ *                     - type: HEADER
+ *                       format: DOCUMENT
+ *                       example:
+ *                         header_handle: ["invoice_pdf_456"]
+ *                     - type: BODY
+ *                       text: Hi {{1}}, your invoice {{2}} is ready.
+ *                       example:
+ *                         body_text: [["Aicha", "#INV-456"]]
+
+ *             VIDEO_Header:
+ *               summary: Template with VIDEO header
+ *               value:
+ *                 botId: izar-logistic
+ *                 payload:
+ *                   name: welcome_video
+ *                   language: en_US
+ *                   category: UTILITY
+ *                   components:
+ *                     - type: HEADER
+ *                       format: VIDEO
+ *                       example:
+ *                         header_handle: ["video_media_id_789"]
+ *                     - type: BODY
+ *                       text: Welcome {{1}}! Here’s a quick intro to our service.
+ *                       example:
+ *                         body_text: [["Aicha"]]
  *     responses:
  *       200:
  *         description: Template created successfully.
@@ -83,7 +117,7 @@ const router = express.Router()
  *               properties:
  *                 message:
  *                   type: string
- *                   example: The message has been created successfully.
+ *                   example: The template has been created successfully.
  *       400:
  *         description: Validation error or request issue.
  *       404:
@@ -150,9 +184,9 @@ router.delete('/:id',deleteTemplate)
  *   post:
  *     summary: Sends a WhatsApp template message using Meta API
  *     description: |
- *       Validates a template by name and bot ID, checks for required parameters
- *       based on the template's component type (HEADER, BODY), formats the message 
- *       accordingly, and sends it via WhatsApp Cloud API using stored bot credentials.
+ *       Sends a WhatsApp message using a pre-approved template. The template can include a header
+ *       (text, image, video, or document) and body parameters. The correct structure must match the 
+ *       template created on Meta's WhatsApp Manager.
  *     requestBody:
  *       required: true
  *       content:
@@ -170,53 +204,104 @@ router.delete('/:id',deleteTemplate)
  *                 description: The unique identifier of the chatbot.
  *               userId:
  *                 type: string
- *                 description: The recipient's WhatsApp phone number in international format.
+ *                 description: WhatsApp phone number of the recipient in international format.
  *               template_name:
  *                 type: string
- *                 description: The name of the WhatsApp template to send.
+ *                 description: Name of the template created in Meta WhatsApp Manager.
  *               language:
  *                 type: string
- *                 description: Language code of the template (e.g., 'en_US').
+ *                 description: Language code of the template (e.g., "en_US").
  *               header_parms:
  *                 type: object
- *                 description: Optional parameter for the template's header component.
- *                 example:
- *                   type: text
- *                   text: "Header Text"
+ *                 description: Header component of the template (optional).
  *               body_parms:
  *                 type: array
- *                 description: Optional array of parameters for the template's body component.
+ *                 description: Parameters for the body component of the template.
  *                 items:
  *                   type: object
- *                   example:
- *                     type: text
- *                     text: "Body parameter"
+ *                   properties:
+ *                     type:
+ *                       type: string
+ *                     text:
+ *                       type: string
+ *           examples:
+ *             Template with TEXT header:
+ *               summary: Header with text
+ *               value:
+ *                 botId: "arts-clinique"
+ *                 userId: "212631759536"
+ *                 template_name: "order_confirmation"
+ *                 language: "en_US"
+ *                 header_parms:
+ *                   type: text
+ *                   text: "#123456"
+ *                 body_parms:
+ *                   - type: text
+ *                     text: "Aicha"
+ *                   - type: text
+ *                     text: "#123456"
+ *                   - type: text
+ *                     text: "Monday, June 17"
+ *             Template with IMAGE header:
+ *               summary: Header with image
+ *               value:
+ *                 botId: "arts-clinique"
+ *                 userId: "212631759536"
+ *                 template_name: "order_confirmation"
+ *                 language: "en_US"
+ *                 header_parms:
+ *                   type: image
+ *                   image: "MEDIA_URL"
+ *                 body_parms:
+ *                   - type: text
+ *                     text: "Aicha"
+ *                   - type: text
+ *                     text: "#123456"
+ *                   - type: text
+ *                     text: "Monday, June 17"
+ *             Template with DOCUMENT header:
+ *               summary: Header with document
+ *               value:
+ *                 botId: "arts-clinique"
+ *                 userId: "212631759536"
+ *                 template_name: "order_confirmation"
+ *                 language: "en_US"
+ *                 header_parms:
+ *                   type: document
+ *                   document: "MEDIA_URL"
+ *                 body_parms:
+ *                   - type: text
+ *                     text: "Aicha"
+ *                   - type: text
+ *                     text: "#123456"
+ *                   - type: text
+ *                     text: "Monday, June 17"
+ *             Template with VIDEO header:
+ *               summary: Header with video
+ *               value:
+ *                 botId: "arts-clinique"
+ *                 userId: "212631759536"
+ *                 template_name: "order_confirmation"
+ *                 language: "en_US"
+ *                 header_parms:
+ *                   type: video
+ *                   video: "MEDIA_URL"
+ *                 body_parms:
+ *                   - type: text
+ *                     text: "Aicha"
+ *                   - type: text
+ *                     text: "#123456"
+ *                   - type: text
+ *                     text: "Monday, June 17"
  *     responses:
  *       200:
  *         description: Template message sent successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               description: Response from WhatsApp Cloud API
  *       400:
- *         description: Bad request - missing or invalid parameters, rejected or pending template, or Supabase error
- *         content:
- *           application/json:
- *             schema:
- *               type: string
+ *         description: Bad request due to invalid parameters or template
  *       404:
  *         description: Template not found
- *         content:
- *           application/json:
- *             schema:
- *               type: string
  *       500:
- *         description: Internal server error or failed to send message
- *         content:
- *           application/json:
- *             schema:
- *               type: object
+ *         description: Internal server error
  */
 router.post('/broadcast', getElements)
 router.get("/:botId", getTemplatesByBot)
