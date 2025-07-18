@@ -75,7 +75,7 @@ const formatParam = (param) => {
         date_time: { fallback_value: param.date_time },
       };
     case "image":
-      return { type: "image", image: { link: param.image } };
+     return { type: "image", image: { link: param.image } };
     case "video":
       return { type: "video", video: { link: param.video } };
     case "document":
@@ -164,12 +164,24 @@ exports.getElements = async (req, res) => {
     let body_var = 0;
 
     components.forEach((c) => {
-      if (c.type === "HEADER" && c.example?.header_text?.length === 1) {
-        header_var = c.example.header_text.length || 0;
-        if (!header_parms && header_var !== 0) {
-          return res.status(400).json("the header parms should contain one parameter");
-        }
-      }
+     if (c.type === "HEADER") {
+  // Handle media header (image/video/document)
+  if (c.format && ["IMAGE", "VIDEO", "DOCUMENT"].includes(c.format)) {
+    header_var = 1;
+    if (!header_parms || !header_parms.image) {
+      return res.status(400).json("Header expects an image but got nothing.");
+    }
+  }
+
+  // Handle text header
+  else if (c.example?.header_text?.length === 1) {
+    header_var = 1;
+    if (!header_parms) {
+      return res.status(400).json("The header parms should contain one parameter");
+    }
+  }
+}
+
 
       if (c.type === "BODY" && c.example?.body_text?.[0]?.length) {
         body_var = c.example.body_text[0].length;

@@ -150,28 +150,55 @@ function validateTemplatePayload(payload) {
     }
 
     // Validate HEADER
-    if (type === 'HEADER') {
-      if (component.format !== 'TEXT') {
-        errors.push('HEADER format must be "TEXT".');
-        continue;
-      }
+if (type === 'HEADER') {
+  const format = component.format;
 
-      if (typeof component.text !== 'string' || component.text.length > 60) {
-        errors.push('HEADER "text" must be a string under 60 characters.');
-        continue;
-      }
+  // Common check for missing example
+  if (!component.example) {
+    errors.push('HEADER must include an "example" object.');
+    continue;
+  }
 
-      const matches = [...component.text.matchAll(variableRegex)];
-      if (matches.length !== 1) {
-        errors.push('HEADER "text" must contain exactly one variable like {{1}}.');
-        continue;
-      }
-
-      if (!component.example || !Array.isArray(component.example.header_text)) {
-        errors.push('HEADER must have an example with "header_text" as a non-empty array.');
-        continue;
-      }
+  if (format === 'TEXT') {
+    if (typeof component.text !== 'string' || component.text.length > 60) {
+      errors.push('HEADER "text" must be a string under 60 characters.');
+      continue;
     }
+
+    const matches = [...component.text.matchAll(variableRegex)];
+    if (matches.length !== 1) {
+      errors.push('HEADER "text" must contain exactly one variable like {{1}}.');
+      continue;
+    }
+
+    if (!Array.isArray(component.example.header_text)) {
+      errors.push('HEADER must have an example with "header_text" as a non-empty array.');
+      continue;
+    }
+
+  } else if (format === 'IMAGE') {
+    if (!component.example.header_handle || !Array.isArray(component.example.header_handle)) {
+      errors.push('HEADER of type "IMAGE" must include an "example.header_handle" string.');
+      continue;
+    }
+
+  } else if (format === 'DOCUMENT') {
+    if (!component.example.header_handle || !Array.isArray(component.example.header_handle)) {
+      errors.push('HEADER of type "DOCUMENT" must include an "example.header_handle" string.');
+      continue;
+    }
+
+  } else if (format === 'VIDEO') {
+    if (!component.example.header_handle || !Array.isArray(component.example.header_handle)) {
+      errors.push('HEADER of type "VIDEO" must include an "example.header_handle" string.');
+      continue;
+    }
+
+  } else {
+    errors.push(`Unsupported HEADER format "${format}". Must be one of: TEXT, IMAGE, DOCUMENT, VIDEO.`);
+    continue;
+  }
+}
 
     // Validate BODY
     if (type === 'BODY') {
@@ -285,7 +312,7 @@ if(meta_api.status === 200){
   } catch (err) {
     console.error("createTemplate error:", err?.response?.data || err.message);
     return res.status(500).json({
-      error: "Internal server error.",
+      error: "Internal server error.", 
       details:err?.response?.data
     });
   }
