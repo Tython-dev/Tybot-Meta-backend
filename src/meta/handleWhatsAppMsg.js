@@ -1,5 +1,5 @@
 const { default: axios } = require("axios");
-const { supabase } = require("../../config/supabase");
+const { supabase } = require("../config/supabase");
 const url = process.env.META_URL;
 // Upload a file to Supabase storage
 const uploadFile = async (file) => {

@@ -8,7 +8,7 @@ const verifyStatus = async (req, res, next) => {
     const { data, error } = await supabase
     .from("bot_tokens")
     .select("token, botpress_url")
-    .eq("email", "chatbot@tython.org")
+    .eq("email", "tybot@tybotflow.com")
     .single(); 
     
     if (error || !data?.token) {

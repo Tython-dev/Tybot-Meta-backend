@@ -1,5 +1,5 @@
 const { default: axios, all } = require("axios");
-const { supabase } = require("../../config/supabase");
+const { supabase } = require("../config/supabase");
 const handleMsg = require("./handleWhatsAppMsg");
 const buildMsg = require("./buildwhatsappMessages");
 const buildFacebookMsg = require("./bulidFacebookMsgs");
@@ -33,7 +33,7 @@ try{
 const response = await supabase
 .from('bot_tokens')
 .select('token')
-.eq('email','chatbot@tython.org')
+// .eq('email','chatbot@tython.org')
 if(response.error){
   console.log(response.error)
 }
@@ -122,7 +122,7 @@ exports.getMetaInfo = async()=>{
   const response = await supabase
   .from('bot_tokens')
 .select('meta_url,meta_version')
-.eq('email','chatbot@tython.org')
+// .eq('email','chatbot@tython.org')
 if(response.error){
   console.log(response.error)
 }
