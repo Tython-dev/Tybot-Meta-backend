@@ -12,6 +12,7 @@ const swaggerUi = require("swagger-ui-express");
 const app = express();
 const port = process.env.PORT || 3009;
 const templateroutes = require("./src/routes/templateRoutes");
+const meta = require("./src/routes/metaRoutes")
 const uploadFiles = require("./src/routes/metaUpload")
 const { default: axios } = require('axios');
 const multer = require('multer');
@@ -47,7 +48,7 @@ app.use(cors(corsOptions));
 app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use('/template',templateroutes)
 app.use("/meta-upload", uploadFiles)
-
+app.use("/", meta)
 
 
 app.get('/', async (req, res) => {

@@ -1,6 +1,6 @@
-const { supabase } = require("../../config/supabase");
-const verifyStatus = require("../../middleware/verifyStatus");
-const { getBotId, getToken, getChannelID, getUserSession } = require("./controllers");
+const { supabase } = require("../config/supabase");
+const verifyStatus = require("../middleware/verifyStatus");
+const {  getToken, getChannelID, getUserSession } = require("./controllers");
 const Redis = require("ioredis");
 const handleFacebookMsg = require("./handleFacebookMessages");
 const handleMsg = require("./handleWhatsAppMsg");
@@ -20,7 +20,40 @@ redis.on("connect", () => {
 redis.on("error", (err) => {
   console.error("❌ Redis connection error:", err);
 });
-exports.sendMsgTOBotpress = async (payload, messageText, botId, phone, token) => {
+
+const getBotId = async (numberId, channel_id) => {
+  try {
+    const response = await supabase
+      .from('channels_config')
+      .select(`
+        *,
+        chatbots ( botId )
+      `)
+      .eq('channel_id', channel_id);
+
+    if (response.error) {
+      console.error('Supabase error:', response.error);
+      return null;
+    }
+
+    const bot = response.data.find(item =>
+      item.config?.phone_number_id === numberId ||
+      item.config?.id_page === numberId
+    );
+
+    if (!bot || !bot.chatbots) {
+      console.warn("Bot config not found or missing botId.");
+      return null;
+    }
+
+    return { bot: bot.chatbots, config: bot };
+  } catch (error) {
+    console.error('Error while getting bot ID:', error);
+    return null;
+  }
+};
+
+exports.sendMsgTOBotpress = async (payload, messageText, botId, phone) => {
   console.log("Sending to Botpress with payload:", JSON.stringify(payload, null, 2));
 
   const msgToBotpress = {
@@ -30,7 +63,7 @@ exports.sendMsgTOBotpress = async (payload, messageText, botId, phone, token) =>
   };
 
   console.log('msgToBotpress:', msgToBotpress);
-
+const token = getToken();
   try {
     const botpressRes = await axios.post(
       `https://botpress.tython.org/api/v1/bots/${botId}/converse/${phone}/secured`,
@@ -60,205 +93,188 @@ exports.sendMsgTOBotpress = async (payload, messageText, botId, phone, token) =>
   }
 };
 
-exports.metaApi = async(req,res)=>{
-  const {v} = req.params;
+exports.metaApi = async (req, res) => {
+  const { v } = req.params;
   res.status(200).send('EVENT_RECEIVED');
-try{
-      const io = req.app.get("io");
-    console.log('body:', JSON.stringify(req.body))
-    const token = await getToken();
-    let messageText, object, payload, userId, userName, numberId, channel, message, meta_token;
+
+  try {
+    // const io = req.app.get("io");
+    let messageText, payload, userId, userName, numberId, channel, message, meta_token;
+
     const entry = req.body?.entry?.[0];
     const changes = entry?.changes?.[0];
     const value = changes?.value;
     const contact = value?.contacts?.[0];
     userName = contact?.profile.name || null;
-    const timestamp = entry?.messages?.[0].changes?.[0].timestamp || entry?.messaging?.[0].timestamp;
-    message = value?.messages?.[0] || req.body.entry[0]?.messaging?.[0].message;
+    const timestamp = entry?.messages?.[0]?.changes?.[0]?.timestamp || entry?.messaging?.[0]?.timestamp;
+    message = value?.messages?.[0] || req.body.entry[0]?.messaging?.[0]?.message;
     const msgID = message?.id || null;
-    object = req.body.object;
-    userId = contact?.wa_id || req.body.entry?.[0].messaging?.[0].sender?.id;//it maybe a phone number or a fb id
-    numberId = value?.metadata?.phone_number_id ||entry?.id;
+    const object = req.body.object;
+    userId = contact?.wa_id || req.body.entry?.[0].messaging?.[0]?.sender?.id;
+    numberId = value?.metadata?.phone_number_id || entry?.id;
 
-    // 3. Get botId from supabase
-    const getId = await getBotId(numberId) 
-    const botId = getId.botId // it could be a whatapp id, a fb page id or ig page id
-    // 4.get channel id and meta_token
-    if(object.includes("whatsapp")){
-        channel = 'whatsapp';
-        meta_token = getId.wa_token;
-         const { messageText: mt, payload: pl } = await handleMsg(message, meta_token, v);
-                      messageText = mt;
-                      payload = pl;
-    }else if(object.includes("page")){
-        channel = 'facebook';
-        meta_token = getId.fb_token;
-        const { messageText: mt, payload: pl } = await handleFacebookMsg(req.body.entry[0]?.messaging[0]?.message, meta_token);
-                      messageText = mt;
-                      // console.log('messageText',messageText)
-                      payload = req.body.entry[0]?.messaging[0]?.postback?.payload;
-                      if(!req.body.entry[0]?.messaging[0]?.message){
-                        messageText = req.body.entry[0]?.messaging[0]?.postback.title
-                      }
-                      // console.log('messageText:',messageText)
-    }else{
-        channel= 'instagram';
-        meta_token = getId.ig_token; 
-        const { messageText: mt, payload: pl } = await handleIgMsg(req.body.entry[0]?.messaging[0]?.message, meta_token);
-                      messageText = mt;
-                      // console.log('messageText',messageText)
-                      payload = req.body.entry[0]?.messaging[0]?.postback?.payload;
-                      if(!req.body.entry[0]?.messaging[0]?.message){
-                        messageText = req.body.entry[0]?.messaging[0]?.postback.title
-                      }
+    channel = object.includes("whatsapp")
+      ? "whatsapp"
+      : object.includes("page")
+      ? "facebook"
+      : "instagram";
+
+    // Get channelId & bot config in parallel
+    const [channelId, getId] = await Promise.all([
+      getChannelID(channel),
+      getBotId(numberId, await getChannelID(channel))
+    ]);
+    console.log("getBot:", getId)
+    const botId = getId.bot?.botId;
+    meta_token = getId.config?.config?.token;
+
+    if (!botId || !meta_token) {
+      console.warn("Missing botId or token.");
+      return;
     }
-    // get channel id
-    const channelId = await getChannelID(channel)
-     // 5. Save conversation info (expire in 2 hours)
 
- // 1. Upsert user
-      const { error: userError } = await supabase
-        .from("end_users")
-        .upsert({
-          phone: userId,
-          first_name: userName,
-        }, { onConflict: "phone" });
-
-      if (userError) {
-        console.error("❌ Failed to upsert user:", userError.message);
-        
+    // Parse message depending on channel
+    if (channel === "whatsapp") {
+      const result = await handleMsg(message, meta_token, v);
+      messageText = result.messageText;
+      payload = result.payload;
+    } else if (channel === "facebook") {
+      const result = await handleFacebookMsg(req.body.entry[0]?.messaging[0]?.message, meta_token);
+      messageText = result.messageText;
+      payload = req.body.entry[0]?.messaging[0]?.postback?.payload;
+      if (!req.body.entry[0]?.messaging[0]?.message) {
+        messageText = req.body.entry[0]?.messaging[0]?.postback?.title;
       }
-                await redis.del('end_users');
-      // 2. Get or create conversation
-      let conversationId;
-if(!userId){
-  return res.status(404).json('user undefined');
-}
-      const { data: convoData, error: convoError } = await supabase
+    } else {
+      const result = await handleIgMsg(req.body.entry[0]?.messaging[0]?.message, meta_token);
+      messageText = result.messageText;
+      payload = req.body.entry[0]?.messaging[0]?.postback?.payload;
+      if (!req.body.entry[0]?.messaging[0]?.message) {
+        messageText = req.body.entry[0]?.messaging[0]?.postback?.title;
+      }
+    }
+
+    if (!userId) return res.status(200).json('user undefined');
+
+    // Upsert user and fetch conversation in parallel
+    const [userRes, convoRes] = await Promise.all([
+      supabase.from("end_users").upsert({ phone: userId, username: userName }, { onConflict: "phone" }),
+      supabase
         .from("conversations")
         .select("id")
         .eq("bot_id", botId)
         .eq("end_user_id", userId)
+        .single()
+    ]);
+
+    if (userRes.error) console.error("❌ Failed to upsert user:", userRes.error);
+
+    let conversationId;
+
+    if (convoRes.data) {
+      conversationId = convoRes.data.id;
+      await supabase.from("conversations").update({ updated_at: new Date() }).eq("id", conversationId);
+    } else {
+      const { data: newConvo, error: newConvoError } = await supabase
+        .from("conversations")
+        .insert({
+          bot_id: botId,
+          end_user_id: userId,
+          channel_id: channelId,
+          start_time: new Date(),
+          updated_at: new Date(),
+        })
+        .select("id")
         .single();
 
-      if (convoError && convoError.code !== 'PGRST116') {
-        console.error("❌ Error fetching conversation:", convoError.message);
-        
+      if (newConvoError) {
+        console.error("❌ Error creating conversation:", newConvoError.message);
+        return;
       }
 
-      if (convoData) {
-        conversationId = convoData.id;
-        await supabase.from("conversations").update({ updated_at: new Date() }).eq("id", conversationId);
-      } else {
-        const { data: newConvo, error: newConvoError } = await supabase
-          .from("conversations")
-          .insert({
-            bot_id: botId,
-            end_user_id: userId,
-            channel_id: channelId,
-            start_time: new Date(),
-            updated_at: new Date(),
-          })
-          .select("id")
-          .single();
-
-        if (newConvoError) {
-          console.error("❌ Error creating conversation:", newConvoError.message);
-         
-        }
-
-        conversationId = newConvo.id;
-        io.emit("new_conversation",{conversation: {
+      conversationId = newConvo.id;
+      io.emit("new_conversation", {
+        conversation: {
           end_user_id: userId,
           bot_id: botId,
           created_at: new Date(),
           channel_name: channel,
-          id: conversationId
-        }})
-        console.log("🆕 New conversation ID:", conversationId);
+          id: conversationId,
+        },
+      });
+    }
+
+    // Redis store session & message with pipeline
+    const key = `session:${conversationId}`;
+    const messageKey = `${key}:messages`;
+    const existed = await redis.get(key);
+    const sessionData = existed
+      ? { ...JSON.parse(existed), time: timestamp }
+      : {
+          end_user_id: userId,
+          userName,
+          botId,
+          channel: channelId,
+          time: timestamp,
+        };
+
+    const pipeline = redis.pipeline();
+    pipeline.set(key, JSON.stringify(sessionData), 'EX', 2 * 60 * 60);
+    pipeline.rpush(messageKey, JSON.stringify({
+      sender_id: userId,
+      sender_type: "user",
+      content: messageText,
+      sent_at: timestamp || new Date(),
+      is_read: false,
+    }));
+    pipeline.expire(messageKey, 2 * 60 * 60);
+    await pipeline.exec();
+
+    // io.to(conversationId).emit("new-message", {
+    //   user: { from: userId, userMessage: messageText },
+    // });
+
+    // Retrieve user session and bot status
+    const userSession = await getUserSession(userId, botId);
+    const botStatus = userSession?.data?.isPaused || false;
+    if (botStatus) return res.status(200).json("your message was sent!");
+
+    // Send message to Botpress
+    const botpressResponses = await this.sendMsgTOBotpress(payload, messageText, botId, userId);
+    console.log('botpress responses:', botpressResponses);
+
+    let result;
+    const botPipeline = redis.pipeline();
+
+    for (const item of botpressResponses) {
+      // io.to(conversationId).emit("new-message", {
+      //   bot: { conversationId, botId, item }
+      // });
+
+      const msgData = {
+        sender_id: botId,
+        sender_type: "bot",
+        content: item,
+        sent_at: new Date().toISOString(),
+        is_read: false,
+      };
+
+      botPipeline.rpush(messageKey, JSON.stringify(msgData));
+      botPipeline.expire(messageKey, 2 * 60 * 60);
+
+      if (channel === "whatsapp") {
+        result = await waApi({ item, version: v, token: meta_token, userPhone: userId, waPhone: numberId, msgID });
+      } else if (channel === "facebook") {
+        result = await fbapi({ item, version: v, token: meta_token, userPhone: userId, pageId: numberId });
       }
-const key = `session:${conversationId}`;
-const messageKey = `${key}:messages`;
+    }
 
-// 1. Store session data with expiration
-//check if the conversation is already exist
-const existed = await redis.get(key)
-if (existed) {
-  // ✅ Update only the `time` field while keeping other values (botId, channel, etc.)
-  const parsed = JSON.parse(existed);
-  parsed.time = timestamp;
+    await botPipeline.exec();
 
-  await redis.set(key, JSON.stringify(parsed), 'EX', 2 * 60 * 60);
-} else {
-  // ✅ Create a new session
-  const data = {
-    end_user_id: userId,
-    userName,
-    botId,
-    channel: channelId,
-    time: timestamp,
-  };
-  await redis.set(key, JSON.stringify(data), 'EX', 2 * 60 * 60);
-}
-// 2. Append new message
-await redis.rpush(messageKey, JSON.stringify({
-  sender_id: userId,
-  sender_type: "user",
-  content: messageText,
-  sent_at: timestamp || new Date(),
-  is_read: false
-}));
- io.to(conversationId).emit("new-message", {
-            user: { from: userId, userMessage: messageText }
-        });
-// 3. Set expiry on message list
-
-
-// 4. Retrieve both session
-
-const userSession = await getUserSession(userId,botId)
-const botStatus = userSession?.data?.isPaused || false;
-if (botStatus){
-  return res.json("your message was sent!")
-}
-// 6. send message to botpress
-const botpressResponses = await this.sendMsgTOBotpress(payload,messageText,botId,userId,token)
-console.log('botpress:', botpressResponses)
- // 10. Save bot responses and handle WhatsApp sending
-let result;
-for (const item of botpressResponses) {
-   io.to(conversationId).emit("new-message", {
-            bot: {conversationId, botId, item }
-        });
-  try {
-    const msgData = {
-      sender_id: botId,
-      sender_type: "bot",
-      content: item,
-      sent_at: new Date().toISOString(),
-      is_read:false
-    };
-    await redis.rpush(messageKey, JSON.stringify(msgData));
-    await redis.expire(messageKey, 2 * 60 * 60);
-  } catch (err) {
-    console.error('Failed to store botpress message:', item, err);
+     console.log(result || "No response sent.");
+  } catch (error) {
+    console.log("❌ error in metaApi:", error);
+    // return res.status(500).json(error.message || "Server error");
   }
+};
 
-  if(object.includes("whatsapp")){
-    result = await waApi({item,version:v,token:meta_token,userPhone:userId,waPhone:numberId,msgID})
-  } else if(object.includes("page")){
-    result = await fbapi({item,version:v,token:meta_token,userPhone:userId,pageId:numberId})
-  }
-}
-const cachedData = await redis.get(key);
-const cachedMessages = await redis.lrange(messageKey, 0, -1); // Get all messages
-console.log(cachedData)
- if(result){
-
-   return res.status(200).json(result);
- }  
-}catch(error){
-    console.log('error:', error)
-    // return res.status(500).json(error)
-}
-}

@@ -1,8 +1,8 @@
-const controllers = require("../controllers/meta/controllers");
-const { metaApi } = require("../controllers/meta/metaApi");
-const { sendStoryapi, motsClee } = require("../controllers/meta/sendStoryapi");
+const controllers = require("../meta/controllers");
+const { sendStoryapi, motsClee } = require("../meta/sendStoryapi");
 const { authenticateToken } = require("../middleware/authenticateToken");
 const verifyStatus = require("../middleware/verifyStatus");
+const { metaApi } = require("../meta/metaApi");
 
 
 const router = require("express").Router(); 
@@ -79,8 +79,8 @@ const router = require("express").Router();
  *         description: Erreur interne
  */
 
-router.post("/webhook/:botId/:v",verifyStatus, metaApi);
-router.get("/webhook/:botId/:v", controllers.controllers.webhook);  
+router.post("/webhook/:v",verifyStatus, metaApi);
+router.get("/webhook/:v", controllers.controllers.webhook);  
 /**
  * @swagger
  * /desactiver-bot:

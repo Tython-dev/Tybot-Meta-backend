@@ -1,12 +1,13 @@
 const { default: axios } = require("axios");
-const { supabase } = require("../../config/supabase");
+const { supabase } = require("../config/supabase");
 const { getToken, getBotId, getChannelID } = require("./controllers");
 const { fbapi } = require("./facebookApi");
 const handleFacebookMsg = require("./handleFacebookMessages");
 const handleMsg = require("./handleWhatsAppMsg");
-const { sendMsgTOBotpress } = require("./metaApi");
+// const { sendMsgTOBotpress } = require("./metaApi");
 const { waApi } = require("./whatsappApi");
-const redis = require("../../config/redis");
+const redis = require("../config/redis");
+const { sendMsgTOBotpress } = require("./metaApi");
 exports.getnumberId = async(botId)=>{
   try{
     const response = await supabase
@@ -142,7 +143,7 @@ await redis.rpush(messageKey, JSON.stringify({
 // 5. Send both in response
 
 // 6. send message to botpress
-const botpressResponses = await sendMsgTOBotpress(payload,messageText,botId,userId,token)
+const botpressResponses = await sendMsgTOBotpress(payload,messageText,botId,userId)
 console.log('botpress:', botpressResponses)
  // 10. Save bot responses and handle WhatsApp sending
 for (const item of botpressResponses) {
