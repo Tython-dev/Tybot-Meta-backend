@@ -23,7 +23,8 @@ app.use(bodyParser.urlencoded({ extended: true }));
 // CORS Configuration
 const allowedOrigins = [
 	"http://meta-api.tybot.ma",
-  "http://localhost:5173"
+  "http://localhost:5173",
+  "https://app.tybotflow.com"
 ];
 const corsOptions = {
   origin: (origin, callback) => {
@@ -176,6 +177,56 @@ app.put('/chatbots/switch-bots', async (req, res) => {
     return res.status(500).json({ error: "An error occurred while switching bots and configs." });
   }
 });
+
+
+// auth.routes.js
+
+const APP_ID = "729458686305583";
+const APP_SECRET = "ee9c08dd93701434f5800379220d3612";
+const REDIRECT_URI = "https://app.tybotflow.com/login";
+
+app.get("/facebook/login", (req, res) => {
+  const redirectUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${APP_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=pages_show_list,pages_manage_metadata,pages_messaging,pages_read_engagement`;
+  res.redirect(redirectUrl);
+});
+
+app.get("/auth/facebook/callback", async (req, res) => {
+  const { code } = req.query;
+  if (!code) return res.status(400).send("Missing code from Facebook");
+
+  try {
+    // Step 1: Get user access token
+    const tokenRes = await axios.get("https://graph.facebook.com/v19.0/oauth/access_token", {
+      params: {
+        client_id: process.env.FB_APP_ID,
+        redirect_uri: REDIRECT_URI,
+        client_secret: process.env.FB_APP_SECRET,
+        code,
+      },
+    });
+
+    const userAccessToken = tokenRes.data.access_token;
+
+    // Step 2: Get pages managed by the user
+    const pagesRes = await axios.get("https://graph.facebook.com/me/accounts", {
+      params: { access_token: userAccessToken },
+    });
+
+    const pages = pagesRes.data.data;
+
+    // ➕ (Optionnel) Sauvegarder en base ou rediriger vers frontend
+    res.json({
+      message: "Pages retrieved successfully",
+      pages,
+    });
+
+  } catch (error) {
+    console.error("OAuth callback error:", error.response?.data || error.message);
+    res.status(500).send("OAuth callback failed");
+  }
+});
+
+
 
 
 app.listen(port, () => {
