@@ -35,7 +35,7 @@ jobs:
       - name: Deploy to VM via Bastion
         uses: appleboy/ssh-action@v0.1.8
         with:
-          host: 192.168.100.15
+          host: 192.168.100.132
           username: tybot
 
           key: ${{ secrets.SSH_PRIVATE_KEY }}
