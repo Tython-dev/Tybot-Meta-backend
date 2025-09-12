@@ -2,7 +2,7 @@ const axios = require("axios");
 const { supabase } = require("../config/supabase");
 require("dotenv").config();
 const verifyStatus = async (req, res, next) => {
-  const result = 1;
+  const redis_healthy = false;
   try {
     // Check Supabase
     const { data, error } = await supabase
