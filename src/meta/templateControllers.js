@@ -262,7 +262,50 @@ if (type === 'HEADER') {
 
   return errors.length > 0 ? { valid: false, error: errors } : { valid: true };
 }
+exports.getBotId = async (botId) => {
+  try {
+     const getBot = await supabase
+      .from("chatbots")
+      .select("id")
+      .eq("botId", botId);
 
+    if (getBot.error) {
+      console.error("Error fetching bot:", getBot.error);
+    }
+
+    if (!getBot.data || getBot.data.length === 0) {
+      console.warn("Bot not found in 'chatbots' table.");
+    }
+  
+    const getChannel = await supabase
+    .from("channels")
+    .select("id")
+    .eq("name", "whatsapp")
+     if(getChannel.error){
+      return res.status(400).json(getChannel.error)
+     }
+     const ch_id = getChannel.data[0].id;
+
+    const response = await supabase
+      .from('channels_config')
+      .select('*')
+      .eq('channel_id', ch_id)
+      .eq("chat_id", getBot.data[0].id);
+
+    if (response.error) {
+      console.error('Supabase error:', response.error);
+    }
+
+    if (!response.data || response.data.length === 0) {
+      console.warn('No bot config found for this channel.');
+    }
+
+    return { config: response.data[0].config };
+
+  } catch (error) {
+    console.error('Error while getting bot ID:', error);
+  }
+};
 exports.createTemplate = async (req, res) => {
   try {
     const { botId, payload } = req.body;
@@ -273,21 +316,11 @@ exports.createTemplate = async (req, res) => {
     if (!isValid.valid) {
       return res.status(400).json({ error: isValid.error });
     }
-    const botInfo = await supabase
-      .from("chatbots")
-      .select("whatsapp_business_account_id, wa_token")
-      .eq("botId", botId)
 
-    if (botInfo.error) {
-      return res.status(500).json(botInfo.error);
-    }
-
-    if (!botInfo) {
-      return res.status(404).json({ error: 'No bot found .' });
-    }
-
-    const { whatsapp_business_account_id: wa_acc_id, wa_token: token } = botInfo.data[0];
-
+    const botInfo = await this.getBotId(botId)
+    const wa_acc_id = botInfo.config.business_account_id;
+    const token= botInfo.config.token;
+console.log(wa_acc_id, token)
     const meta_api = await axios.post(
       `${meta_url}/${version}/${wa_acc_id}/message_templates`,
       payload,
