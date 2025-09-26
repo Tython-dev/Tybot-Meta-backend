@@ -34,31 +34,35 @@ Best regards,`,
     console.log("✅ Email sent:", info.messageId);
   } catch (error) {
     console.error("❌ Error sending email:", error);
-  }
+  }        
 }
-const check = async (msg, conversationId, redisIsHealthy) => {
-  try {
-   if (redisIsHealthy) {
+const check = (msg, conversationId, redisIsHealthy) => {
+  if (redisIsHealthy) {
     console.log("✅ Redis is healthy");
-    return;
+    return Promise.resolve();
   }
-    await sendTestEmail()
+  
+  // Non-blocking email send
+  sendTestEmail().catch(error => {
+    console.error("Email send failed:", error.message);
+  });
+  
   console.log("❌ Redis is not healthy, saving to Supabase...");
-    
-    const { error: msgError } = await supabase.from("messages").insert({
-      conversation_id: conversationId,
-      sender_id: msg.sender_id,
-      content: msg.content,
-      sender_type: msg.sender_type,
-      sent_at: msg.sent_at,
-      is_read: msg.is_read || false,
-    });
-
+  
+  // Non-blocking Supabase insert
+  return supabase.from("messages").insert({
+    conversation_id: conversationId,
+    sender_id: msg.sender_id,
+    content: msg.content,
+    sender_type: msg.sender_type,
+    sent_at: msg.sent_at,
+    is_read: msg.is_read || false,
+  }).then(({ error: msgError }) => {
     if (msgError) {
       console.error("❌ Error inserting message:", msgError.message);
     }
-  } catch (err) {
-    console.error("❌ Redis check failed:", err.message);
-  }
+  }).catch(err => {
+    console.error("❌ Supabase insert failed:", err.message);
+  });
 };
 module.exports = check;
