@@ -1,7 +1,7 @@
-const redis = require("../../config/redis");
-const { supabase } = require("../../config/supabase");
-const { getUserSession } = require("./controllers");
+const redis = require("../config/redis");
+const { supabase } = require("../config/supabase");
 const { fbapi } = require("./facebookApi");
+const  {getUserSession} = require("./metaApi");
 const { waApi } = require("./whatsappApi");
 
 exports.lvMsg= async(req,res)=>{
@@ -51,7 +51,7 @@ if (existed) {
   const parsed = JSON.parse(existed);
   parsed.time = new Date();
 
-  await redis.set(key, JSON.stringify(parsed), 'EX', 2 * 60 * 60);
+  await redis.set(key, JSON.stringify(parsed), 'EX', 24 * 60 * 60);
 } else {
   // ✅ Create a new session
   const data = {
@@ -61,12 +61,12 @@ if (existed) {
     channel: channelId,
     time: new Date(),
   };
-  await redis.set(key, JSON.stringify(data), 'EX', 2 * 60 * 60);
+  await redis.set(key, JSON.stringify(data), 'EX', 24 * 60 * 60);
 }
 // 2. Append new message
 await redis.rpush(messageKey, JSON.stringify({
   sender_id: req.body,
-  sender_type: "live-agent",
+  sender_type: "live_agent",
   content: text,
   sent_at: new Date(),
   is_read: false

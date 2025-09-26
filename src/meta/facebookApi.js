@@ -1,6 +1,5 @@
 const { default: axios } = require("axios");
 const buildFacebookMsg = require("./bulidFacebookMsgs");
-const { getMetaInfo } = require("./controllers");
 
 require("dotenv").config();
 function buildCarouselMsg(product,productPayload, userPhone) {
@@ -33,9 +32,23 @@ function buildCarouselMsg(product,productPayload, userPhone) {
     }
   };
 }
-
+exports.getMetaInfo = async()=>{
+  try{
+  const response = await supabase
+  .from('bot_tokens')
+.select('meta_url,meta_version')
+.eq('email','chatbot@tython.org')
+if(response.error){
+  console.log(response.error)
+}
+console.log(response)
+return response.data[0]
+}catch(err){
+    console.error("Error getting token:", err);
+  }
+}
 exports.fbapi = async({item,url,version,token,userPhone,pageId})=>{
-    const metaInfo = await getMetaInfo()
+    const metaInfo = await this.getMetaInfo()
     console.log('meta_info:', metaInfo)
 const meta_url = metaInfo.meta_url|| url || process.env.META_URL;
 const meta_version =metaInfo.meta_version|| version || process.env.META_VERSION;

@@ -1,8 +1,22 @@
 const { default: axios } = require("axios");
 const buildMsg = require("./buildwhatsappMessages");
-const { getMetaInfo } = require("./controllers");
+const { supabase } = require("../config/supabase");
 
 require("dotenv").config();
+exports.getMetaInfo = async()=>{
+  try{
+  const response = await supabase
+  .from('bot_tokens')
+.select('meta_url,meta_version')
+if(response.error){
+  console.log(response.error)
+}
+console.log(response)
+return response.data[0]
+}catch(err){
+    console.error("Error getting token:", err);
+  }
+}
 function buildCarouselMsg(product,productPayload, userPhone) {
     console.log('productPayload:',productPayload)
   return {
@@ -28,7 +42,7 @@ function buildCarouselMsg(product,productPayload, userPhone) {
                                       type: "reply",
                                       reply: {
                                           id: JSON.stringify(productPayload), // Stringify the full payload array
-                                          title: product.title.substring(0, 20)
+                                          title: product.actions[0]?.title || product.title.substring(0, 20)
                                       }
                                   }]
                               }
@@ -40,10 +54,10 @@ function buildCarouselMsg(product,productPayload, userPhone) {
 
 exports.waApi = async({item,url,version,token,userPhone,waPhone, msgID})=>{
     console.log('token:', token)
-    const metaInfo = await getMetaInfo()
+    const metaInfo = await this.getMetaInfo()
     console.log('meta_info:', metaInfo)
 const meta_url = metaInfo.meta_url|| url || process.env.META_URL;
-const meta_version = metaInfo.meta_version|| version || process.env.META_VERSION;
+const meta_version = version || metaInfo.meta_version || process.env.META_VERSION;
 const sentMessages = [];
      let content;
             if (item.type === "carousel") {
@@ -67,7 +81,7 @@ const sentMessages = [];
                         });
                         continue;
                     }
-                    const productPayload = action.payload; // Use the full payload array
+                    const productPayload = action.payload || [product.title]; // Use the full payload array
                     try {
                       const carouselMsg = buildCarouselMsg(product,productPayload, userPhone);
                       

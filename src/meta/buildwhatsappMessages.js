@@ -57,14 +57,14 @@ async function buildMsg (item, phone){
               type: "interactive",
               interactive: {
                 type: "list",
-                body: { text: item.text || item.dropdownPlaceholder },
+                body: { text: item.text || item.dropdownPlaceholder || "Please make a selection"},
                 action: {
                   button: "Options",
                   sections: [{
                     title: item.title||"Options",
                     rows: choices.map(choice => ({
                       id: choice.value,
-                      title: choice.title,
+                      title: choice.title.slice(0, 23),
                       description: choice.description || ""
                     }))
                   }]
@@ -78,7 +78,7 @@ async function buildMsg (item, phone){
               return {
                 ...base,
                 type: "text",
-                text: { body: item.placeholderText || "Please make a selection" }
+                text: { body: item.message || "Please make a selection" }
               };
             }
       
@@ -87,7 +87,7 @@ async function buildMsg (item, phone){
               type: "interactive",
               interactive: {
                 type: "list",
-                body: { text: item.placeholderText || item.dropdownPlaceholder },
+                body: { text: item.message || item.placeholderText || item.dropdownPlaceholder || "make a selection:" },
                 action: {
                   button: "Options",
                   sections: [{
@@ -134,7 +134,6 @@ async function buildMsg (item, phone){
         }
       }
   if (item.type === "card") {
-    console.log('here is the issue:', item)
   const others = [];
   var bodyText = item.title;
  for (const u of item.actions) {
@@ -148,7 +147,7 @@ async function buildMsg (item, phone){
     }
 
  const payload = item.actions[0].payload
- 
+
   return {
     ...base,
     type: "interactive",
@@ -169,7 +168,7 @@ async function buildMsg (item, phone){
           ? others.map(b => ({
               type: "reply",
               reply: {
-                id: JSON.stringify(payload),
+                id:JSON.stringify(payload),
                 title: b.title
               }
             }))
