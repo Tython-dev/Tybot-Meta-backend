@@ -66,15 +66,17 @@ const { uploadFile } = require("../controllers/MINIOSupabase/minioController");
 // Download media from Facebook and upload it
 const downloadAndUpload = async (id, v, token, name = "file") => {
   try {
-    // Get meta info
+    // Get meta info with timeout
     const meta = await axios.get(`${url}/${v}/${id}`, {
       headers: { Authorization: `Bearer ${token}` },
+      timeout: 10000
     });
 
     const mediaUrl = meta.data.url;
     const fileRes = await axios.get(mediaUrl, {
       headers: { Authorization: `Bearer ${token}` },
       responseType: "arraybuffer",
+      timeout: 15000
     });
 
     const file = {

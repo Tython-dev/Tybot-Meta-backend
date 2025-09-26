@@ -5,6 +5,7 @@ if (dotenv.error) {
 }
 const fs = require('fs');
 const FormData = require('form-data');
+const http = require("http");
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const swaggerSpec = require("./src/config/swaggerConfig");
@@ -17,6 +18,7 @@ const uploadFiles = require("./src/routes/metaUpload")
 const { default: axios } = require('axios');
 const multer = require('multer');
 const { supabase } = require('./src/config/supabase');
+const { Server } = require('socket.io');
 const upload = multer({ dest: 'uploads/' });
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -44,7 +46,35 @@ const corsOptions = {
 app.use(cors(corsOptions));
 // app.use(cors());
 
+// Socket.IO setup
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: [
+      "http://localhost:5173",
+      "http://localhost:5174",
+      "https://chatflow.tybot.ma",
+      "https://api.tybotflow.com",
+      "https://api-dev.tybotflow.com",
+      "https://app.tybotflow.com",
+      "http://localhost:5500",
+      "https://www.arts-casablanca.com",
+      "https://artsclinic.com",
+      "https://arts-clinic.com",
+      "https://evmobility.tybotflow.com",
+    ],
+    methods: ["GET", "POST"],
+  },
+});
 
+app.set("io", io); 
+io.on("connection", (socket) => {
+  console.log("Un utilisateur est connecté : " + socket.id);
+  socket.on("join_room", (roomId) => {
+    socket.join(roomId);
+    console.log(`🔗 User ${socket.id} joined room: ${roomId}`);
+  });
+});
 // Swagger setup
 app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use('/template',templateroutes)
@@ -229,6 +259,6 @@ app.get("/auth/facebook/callback", async (req, res) => {
 
 
 
-app.listen(port, () => {
+server.listen(port, () => {
   console.log(`Server is running at http://localhost:${port}`);
 });

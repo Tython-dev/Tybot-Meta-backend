@@ -1,9 +1,5 @@
 const { v4: uuidv4 } = require("uuid");
-
 const { default: axios } = require("axios");
-// const handleIgMsg = require("./handleInstagramMsg");
-// const handleTelegram = require("./handletelegramMsg");
-// const { telegramApi } = require("./telegramApi");
 const check = require("../middleware/redisstatus");
 const redis = require("../config/redis");
 const { waApi } = require("./whatsappApi");
@@ -11,6 +7,9 @@ const handleFacebookMsg = require("./handleFacebookMessages");
 const handleMsg = require("./handleWhatsAppMsg");
 const { fbapi } = require("./facebookApi");
 const { supabase } = require("../config/supabase");
+const { telegramApi } = require("./telegramApi");
+const handleTelegram = require("./handletelegramMsg");
+const handleIgMsg = require("./handleInstagramMsg");
 
 redis.on("connect", () => {
   console.log("✅ Connected to Redis");
@@ -63,6 +62,7 @@ exports.getBotId = async (numberId, channel_id) => {
 
     if (!bot) {
       console.warn("Bot config not found for this numberId.");
+      return null;
     }
 
     const getBot = await supabase
@@ -104,11 +104,9 @@ exports.getChannelID = async(channel)=>{
 }
 }
 exports.sendMsgTOBotpress = async (payload, messageText, botId, phone, ch) => {
-  console.log("Sending to Botpress with payload:", JSON.stringify(payload, null, 2));
-const botpressInfo = await this.getbotpressInfo();
-const botpress_url = botpressInfo.botpress_url;
-const botpress_token = botpressInfo.token;
-console.log("here the payload:", { text: messageText, payload });
+  const botpressInfo = await this.getbotpressInfo();
+  const botpress_url = botpressInfo.botpress_url;
+  const botpress_token = botpressInfo.token;
 
 let parsedPayload;
 if (typeof payload === "string") {
@@ -127,7 +125,7 @@ const msgToBotpress = {
   ...(parsedPayload ? { payload: parsedPayload } : {}),
 };
 
-console.log("msgToBotpress:", JSON.stringify(msgToBotpress));
+
 
 if (messageText === null) {
   return [
@@ -146,10 +144,11 @@ if (messageText === null) {
       {
         headers: {
           Authorization: `Bearer ${botpress_token}`
-        }
+        },
+        timeout: 10000
       }
     );
-console.log('response bot:',botpressRes)
+
     const botResponses = Array.isArray(botpressRes.data.responses)
       ? botpressRes.data.responses
       : [{
@@ -168,17 +167,14 @@ console.log('response bot:',botpressRes)
   }
 };
 exports.getUserSession = async(userId, botId, ch) => {
-  console.log("👉 getUserSession called with:", userId, botId); 
-
-  // const token = await this.getToken();
-
   try {
-const botpress = await this.getbotpressInfo();
+    const botpress = await this.getbotpressInfo();
 
     const response = await axios.get(`${botpress.botpress_url}/api/v1/bots/${botId}/mod/hitl/sessions?pausedOnly=false`, {
       headers: {
         Authorization: `Bearer ${botpress.token}`,
       },
+      timeout: 5000
     });
 
     const allSessions = response.data;
@@ -208,10 +204,15 @@ const botpress = await this.getbotpressInfo();
 
 exports.metaApi = async (req, res) => {
   const { v } = req.params;
+  
+  // Acknowledge webhook immediately
   res.status(200).send("EVENT_RECEIVED");
 
   try {
     const io = req.app.get("io");
+    if (!io) {
+      console.warn("Socket.io not available - continuing without real-time updates");
+    }
     console.log("body:", JSON.stringify(req.body));
 
     let messageText, payload, userId, userName, numberId, channel, message, meta_token, ch;
@@ -225,12 +226,13 @@ exports.metaApi = async (req, res) => {
     numberId = value?.metadata?.phone_number_id || entry?.id;
     const object = req.body.object;
 let redisIsHealthy = false;
-try {
-  const pong = await redis.ping();
+// Non-blocking Redis health check
+redis.ping().then(pong => {
   redisIsHealthy = pong === "PONG";
-} catch (error) {
+}).catch(error => {
   console.error("Redis health check failed:", error.message);
-}
+  redisIsHealthy = false;
+});
 console.log("entry here:", JSON.stringify(value?.messages?.[0], null, 2))
     // Detect channel
     if(object){
@@ -253,8 +255,14 @@ console.log("entry here:", JSON.stringify(value?.messages?.[0], null, 2))
     }
     const channelId = await this.getChannelID(channel);
     const getId = await this.getBotId(numberId, channelId);
+    
+    if (!getId?.bot?.botId) {
+      console.error("Bot ID not found for numberId:", numberId);
+      return;
+    }
+    
     console.log('bot_id:', getId)
-    const botId = getId?.bot?.botId;
+    const botId = getId.bot.botId;
     meta_token = getId?.config?.config?.token;
     
 
@@ -262,30 +270,48 @@ console.log("entry here:", JSON.stringify(value?.messages?.[0], null, 2))
     const timestamp = message?.timestamp || req.body?.entry?.[0]?.messaging?.[0]?.timestamp;
     const msgID = message?.id || uuidv4(); // Generate unique msg_id if missing
 
-    // Extract messageText & payload based on channel
-    if (channel === "whatsapp") {
-      const { messageText: mt, payload: pl } = await handleMsg(message, meta_token, v);
-      messageText = mt;
-      payload = pl;
-    } else if (channel === "facebook") {
-      const fbMessage = req.body?.entry?.[0]?.messaging?.[0];
-      const { messageText: mt, payload: pl } = await handleFacebookMsg(fbMessage?.message, meta_token);
-      messageText = mt || fbMessage?.postback?.title || "";
-      payload = fbMessage?.postback?.payload || pl;
-    }else if(channel === "telegram"){
-      const { messageText: mt, payload: pl } = await handleTelegram(message, meta_token);
-      messageText = mt;
-      payload = pl;
-    }
-    else {
-      const igMessage = req.body?.entry?.[0]?.messaging?.[0];
-      const { messageText: mt, payload: pl } = await handleIgMsg(igMessage?.message, meta_token);
-      messageText = mt || igMessage?.postback?.title || "";
-      payload = igMessage?.postback?.payload || pl;
+    // Extract messageText & payload based on channel with timeout
+    try {
+      if (channel === "whatsapp") {
+        const result = await Promise.race([
+          handleMsg(message, meta_token, v),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Handler timeout')), 20000))
+        ]);
+        messageText = result.messageText;
+        payload = result.payload;
+      } else if (channel === "facebook") {
+        const fbMessage = req.body?.entry?.[0]?.messaging?.[0];
+        const result = await Promise.race([
+          handleFacebookMsg(fbMessage?.message, meta_token),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Handler timeout')), 20000))
+        ]);
+        messageText = result.messageText || fbMessage?.postback?.title || "";
+        payload = fbMessage?.postback?.payload || result.payload;
+      }else if(channel === "telegram"){
+        const result = await Promise.race([
+          handleTelegram(message, meta_token),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Handler timeout')), 20000))
+        ]);
+        messageText = result.messageText;
+        payload = result.payload;
+      }
+      else {
+        const igMessage = req.body?.entry?.[0]?.messaging?.[0];
+        const result = await Promise.race([
+          handleIgMsg(igMessage?.message, meta_token),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Handler timeout')), 20000))
+        ]);
+        messageText = result.messageText || igMessage?.postback?.title || "";
+        payload = igMessage?.postback?.payload || result.payload;
+      }
+    } catch (error) {
+      console.error("Message handler timeout or error:", error.message);
+      messageText = "Processing timeout - please try again";
+      payload = null;
     }
 
     if (!userId) {
-      console.log("user undefined");
+      console.warn("User ID not found in request");
       return;
     }
 
@@ -300,7 +326,10 @@ console.log("entry here:", JSON.stringify(value?.messages?.[0], null, 2))
 
     if (userError) console.error("❌ Failed to upsert user:", userError);
     
-if(redisIsHealthy) await redis.del("end_users");
+// Non-blocking Redis operations
+redis.del("end_users").catch(error => {
+  console.error("Redis del failed:", error.message);
+});
 
     // Get or create conversation
     let conversationId;
@@ -333,30 +362,40 @@ if(redisIsHealthy) await redis.del("end_users");
 
       if (newConvoError) {
         console.error("❌ Error creating conversation:", newConvoError.message);
+        return;
       }
 
       conversationId = newConvo?.id;
 
-      io.emit("new_conversation", {
-        conversation: {
-          end_user_id: userId,
-          bot_id: botId,
-          created_at: new Date(),
-          channel_name: channel,
-          id: conversationId,
-        },
-      });
+      if (!conversationId) {
+        console.error("Failed to create conversation");
+        return;
+      }
+
+      if (io) {
+        io.emit("new_conversation", {
+          conversation: {
+            end_user_id: userId,
+            bot_id: botId,
+            created_at: new Date(),
+            channel_name: channel,
+            id: conversationId,
+          },
+        });
+      }
 
       console.log("🆕 New conversation ID:", conversationId);
+    }
+
+    if (!conversationId) {
+      console.error("No valid conversation ID");
+      return;
     }
 
     const key = `session:${conversationId}`;
     const messageKey = `${key}:messages`;
 
-  
-if(redisIsHealthy) {
-    // Set session
-    const existed = await redis.get(key);
+    // Non-blocking Redis session set
     const sessionData = {
       end_user_id: userId,
       userName,
@@ -364,9 +403,9 @@ if(redisIsHealthy) {
       channel: channelId,
       time: timestamp,
     };
-
-    await redis.set(key, JSON.stringify(sessionData), "EX", 24 * 60 * 60);
-} 
+    redis.set(key, JSON.stringify(sessionData), "EX", 24 * 60 * 60).catch(error => {
+      console.error("Redis set session failed:", error.message);
+    }); 
 
     // Push user message with msg_id
     const userMsgData = {
@@ -377,37 +416,45 @@ if(redisIsHealthy) {
       sent_at: new Date().toISOString(),
       is_read: false,
     };
-  await  check({sender_id: userId,
+    
+    // Non-blocking check function
+    check({sender_id: userId,
       sender_type: "user",
       content: messageText,
       sent_at: new Date().toISOString(),
-      is_read: false,},conversationId, redisIsHealthy)
-      if(redisIsHealthy) {
- await redis.rpush(messageKey, JSON.stringify(userMsgData));
-} 
-
-    
-    io.to(conversationId).emit("new-message", {
-      user: { from: userId, userMessage: messageText },
+      is_read: false,},conversationId, redisIsHealthy).catch(error => {
+        console.error("Check function failed:", error.message);
+      });
+      
+    // Non-blocking Redis user message push
+    redis.rpush(messageKey, JSON.stringify(userMsgData)).catch(error => {
+      console.error("Redis rpush user message failed:", error.message);
     });
+    
+    if (io) {
+      io.to(conversationId).emit("new-message", {
+        user: { from: userId, userMessage: messageText },
+      });
+    }
 
     // Bot paused check
     const userSession = await this.getUserSession(userId, botId, ch);
     const botStatus = userSession?.data?.isPaused || false;
-    if (botStatus){  console.log("your message was sent!");
+    if (botStatus) {
+      console.info("Bot is paused for user:", userId);
       return;
     }
-    console.log('bot id:', botId, userId)
-    // Send message to botpress
+
+    // Send message to botpress after session setup
     const botpressResponses = await this.sendMsgTOBotpress(payload, messageText, botId, userId, ch);
-console.log(JSON.stringify(botpressResponses, null, 2));
-    console.log("botpress responses:", botpressResponses);
 
     let result;
     for (const item of botpressResponses) {
-      io.to(conversationId).emit("new-message", {
-        bot: { conversationId, botId, item },
-      });
+      if (io) {
+        io.to(conversationId).emit("new-message", {
+          bot: { conversationId, botId, item },
+        });
+      }
 
       const botMsgData = {
         msg_id: uuidv4(),
@@ -417,17 +464,23 @@ console.log(JSON.stringify(botpressResponses, null, 2));
         sent_at: new Date().toISOString(),
         is_read: false,
       };
-   await check({
+      // Non-blocking check function
+      check({
         sender_id: botId,
         sender_type: "bot",
         content: item,
         sent_at: new Date().toISOString(),
         is_read: false,
-      },conversationId, redisIsHealthy)
-      if(redisIsHealthy) {
-   await redis.rpush(messageKey, JSON.stringify(botMsgData));
-      await redis.expire(messageKey, 24 * 60 * 60);
-}
+      },conversationId, redisIsHealthy).catch(error => {
+        console.error("Check function failed:", error.message);
+      });
+      // Non-blocking Redis bot message operations
+      redis.rpush(messageKey, JSON.stringify(botMsgData)).catch(error => {
+        console.error("Redis rpush bot message failed:", error.message);
+      });
+      redis.expire(messageKey, 24 * 60 * 60).catch(error => {
+        console.error("Redis expire failed:", error.message);
+      });
 
      
 
@@ -440,15 +493,14 @@ console.log(JSON.stringify(botpressResponses, null, 2));
       }
     }
 
-    // Optional logging
-    if(redisIsHealthy) {
-  const cachedData = await redis.get(key);
-    console.log("🔒 Cached session data:", cachedData);
-    
-    }
+    // Optional non-blocking Redis logging
+    redis.get(key).then(cachedData => {
+      console.log("🔒 Cached session data:", cachedData);
+    }).catch(error => {
+      console.error("Redis get cached data failed:", error.message);
+    });
 
-    // if (result) res.status(200).json(result);
   } catch (error) {
-    console.log("❌ error:", error);
+    console.error("❌ Error processing webhook:", error);
   }
 };
