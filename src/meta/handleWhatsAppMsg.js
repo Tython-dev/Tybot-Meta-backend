@@ -1,36 +1,72 @@
 const { default: axios } = require("axios");
-const { supabase } = require("../config/supabase");
 const url = process.env.META_URL;
-// Upload a file to Supabase storage
-const uploadFile = async (file) => {
-  const filePath = `uploads/${Date.now()}-${file.originalname}`;
-  const response = await supabase.storage
-    .from("files")
-    .upload(filePath, file.buffer, {
-      contentType: file.mimetype,
-      upsert: true,
-    });
+const { uploadFile } = require("../controllers/MINIOSupabase/minioController");
+// const uploadFile = async (file) => {
+//   try {
+//     const fileSize = Buffer.byteLength(file.buffer);
 
-  if (response.error) {
-    console.log("Upload error:", response.error);
-    return null;
-  }
+//     const { data: domainRow, error: domErr } = await supabase
+//       .from("domains")
+//       .select("storage_bucket_name, storage_quota")
+//       .eq("name", "meta")
+//       .single();
+//     if (domErr || !domainRow) {
+//       console.log({ error: "Domain not found" });
+//       return null;
+//     }
+//     const { storage_bucket_name, storage_quota } = domainRow;
+//     if (!storage_bucket_name) {
+//      console.log({ error: "No bucket assigned to this domain" });
+//      return null;
+//     }
 
-  const { data: publicUrlData } = supabase.storage
-    .from("files")
-    .getPublicUrl(filePath);
+//     let continuationToken = null;
+//     let totalUsed = 0;
+//     do {
+//       const listParams = {
+//         Bucket: storage_bucket_name,
+//         ContinuationToken: continuationToken || undefined,
+//       };
+//       const listed = await s3.listObjectsV2(listParams).promise();
+//       for (const obj of listed.Contents) {
+//         totalUsed += obj.Size;
+//       }
+//       continuationToken = listed.IsTruncated
+//         ? listed.NextContinuationToken
+//         : null;
+//     } while (continuationToken);
 
-  if (!publicUrlData || !publicUrlData.publicUrl) {
-    console.log({ error: "Failed to retrieve image URL" });
-    return null;
-  }
+//     if (totalUsed + fileSize > storage_quota) {
+//      console.log({ error: "Uploading this file would exceed your 3 GiB quota." });
+//      return null;
+//     }
 
-  return publicUrlData.publicUrl;
-};
+//     const key = `${Date.now()}_${file.originalname}`;
+//     await s3
+//       .putObject({
+//         Bucket: storage_bucket_name,
+//         Key: key,
+//         Body: file.buffer,
+//         ContentType: file.mimetype,
+//       })
+//       .promise();
 
+//     const presignedURL = s3.getSignedUrl("getObject", {
+//       Bucket: storage_bucket_name,
+//       Key: key,
+//       Expires: 60 * 60, // 1 hour
+//     });
+//     return presignedURL;
+    
+//   } catch (err) {
+//     console.error(err);
+//     return null;
+//   }
+// };
 // Download media from Facebook and upload it
-const downloadAndUpload = async (id,v, token, name = "file") => {
+const downloadAndUpload = async (id, v, token, name = "file") => {
   try {
+    // Get meta info
     const meta = await axios.get(`${url}/${v}/${id}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -45,18 +81,59 @@ const downloadAndUpload = async (id,v, token, name = "file") => {
       originalname: `${name}-${Date.now()}`,
       buffer: fileRes.data,
       mimetype: fileRes.headers["content-type"],
+      size: fileRes.data.length, // 🔹 added size
     };
 
-    return await uploadFile(file);
+    console.log("✅ File downloaded:", {
+      name: file.originalname,
+      size: file.size,
+      type: file.mimetype,
+    });
+
+    function createMockRes() {
+      const resData = { statusCode: 200, body: null };
+      return {
+        status(code) {
+          resData.statusCode = code;
+          return this;
+        },
+        json(payload) {
+          resData.body = payload;
+          return this;
+        },
+        getData() {
+          return resData;
+        },
+      };
+    }
+
+    const mockRes = createMockRes();
+
+    // 🔹 include user + body if needed
+    await uploadFile(
+      {
+        file,
+        params: { bucketName: "zack10" },
+        body: {}, // add folderPath/metadata here if you want
+        user: { userId: "system" },
+      },
+      mockRes
+    );
+
+    const result = mockRes.getData();
+    console.log("here:", JSON.stringify(result, null, 2));
+    return result.body?.urls?.supabase?.signed; // or .public
   } catch (err) {
-    console.error("Error downloading/uploading media:", err.message);
+    console.error("Error downloading/uploading media:", err);
     return null;
   }
 };
 
+
 const handleMsg = async (msg, token, v) => {
   let messageText = "";
   let payload;
+  console.log('message from whatsapp:', msg)
   // let type = msg?.type;
   switch (msg?.type) {
     case "text":
@@ -69,7 +146,7 @@ const handleMsg = async (msg, token, v) => {
           "Received button_reply:",
           JSON.stringify(msg.interactive.button_reply, null, 2)
         );
-        messageText = msg.interactive.button_reply.title;
+        messageText = msg.interactive.button_reply.title || msg.interactive.button_reply.text;
 
         if (!msg.interactive.button_reply.id) {
           console.error("button_reply.id is missing or undefined");
@@ -129,9 +206,14 @@ const handleMsg = async (msg, token, v) => {
         payload = msg.contacts;
       }
       break;
-
+ 
+    case "button":
+      console.log("button_template:", msg.button)
+      messageText = msg.button?.text
+      break;
     default:
       console.log("Unhandled message type:", msg?.type);
+      messageText = null;
       return { status: 200, message: "Message type not supported" };
   }
 
